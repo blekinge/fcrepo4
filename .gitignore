@@ -3,6 +3,9 @@ target/
 .settings/
 .project
 .metadata
+.ipr
+.iml
+.iws
 ActiveMQ/
 FedoraRepository/
 indexes/
