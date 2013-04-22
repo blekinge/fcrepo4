@@ -16,18 +16,27 @@
   <description>Parent project for fcrepo</description>
 
   <properties>
+    <!-- Use ${project_name} instead of ${project.artifactId} to avoid incorrect 
+      replacements of "fcrepo4" in child modules (for scm, site-distribution, etc -->
+    <project_name>fcrepo4</project_name>
+
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Dependency version properties -->
     <activemq.version>5.7.0</activemq.version>
-    <cxf.version>2.7.2</cxf.version>
-    <modeshape.version>3.1.1.Final</modeshape.version>
-    <slf4j.version>1.7.2</slf4j.version>
+    <jersey.version>1.17.1</jersey.version>
+    <enunciate.version>1.26.2</enunciate.version>
+    <infinispan.version>5.3.0.Alpha1</infinispan.version>
+    <jgroups.version>3.3.0.CR1</jgroups.version>
+    <modeshape.version>3.2-SNAPSHOT</modeshape.version>
+    <sesame.version>2.7.0</sesame.version>
+    <slf4j.version>1.7.5</slf4j.version>
     <spring.version>3.2.0.RELEASE</spring.version>
 
-    <enunciate.version>1.26.2</enunciate.version>
-    <!-- Use ${project_name} instead of ${project.artifactId} to avoid incorrect 
-      replacements of "fcrepo4" in child modules -->
-    <project_name>fcrepo4</project_name>
+    <!-- https://github.com/github/maven-plugins/blob/master/README.md -->
+    <github.global.server>github</github.global.server>
+    <powermock.version>1.5</powermock.version>
   </properties>
 
   <modules>
@@ -35,8 +44,14 @@
     <module>fcrepo-audit</module>
     <module>fcrepo-webapp</module>
     <module>fcrepo-jms</module>
-    <module>fcrepo-dc</module>
+    <module>fcrepo-generator-dc</module>
+    <module>fcrepo-generator-rdf</module>
     <module>fcrepo-legacy-api</module>
+    <module>fcrepo-http-commons</module>
+    <module>fcrepo-rss</module>
+    <module>fcrepo-http-api</module>
+    <module>fcrepo-webhooks</module>
+    <module>fcrepo-metrics</module>
   </modules>
 
   <dependencyManagement>
@@ -53,10 +68,10 @@
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>javax.jcr</groupId>
-        <artifactId>jcr</artifactId>
-        <version>2.0</version>
-        <!-- <scope>provided</scope> -->
+        <groupId>javax</groupId>
+        <artifactId>javaee-api</artifactId>
+        <version>6.0</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>javax.inject</groupId>
@@ -64,10 +79,29 @@
         <version>1</version>
       </dependency>
       <dependency>
+        <groupId>javax.jcr</groupId>
+        <artifactId>jcr</artifactId>
+        <version>2.0</version>
+      </dependency>
+      <dependency>
+        <groupId>joda-time</groupId>
+        <artifactId>joda-time</artifactId>
+        <version>2.2</version>
+      </dependency>
+      <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>13.0.1</version>
-        <!-- <scope>provided</scope> -->
+        <version>14.0.1</version>
+      </dependency>
+      <dependency>
+        <groupId>org.infinispan</groupId>
+        <artifactId>infinispan-core</artifactId>
+        <version>${infinispan.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jgroups</groupId>
+        <artifactId>jgroups</artifactId>
+        <version>${jgroups.version}</version>
       </dependency>
       <dependency>
         <groupId>org.osgi</groupId>
@@ -75,12 +109,49 @@
         <version>5.0.0</version>
         <!-- <scope>provided</scope> -->
       </dependency>
-
       <dependency>
-        <groupId>org.apache.cxf</groupId>
-        <artifactId>cxf-rt-transports-http-jetty</artifactId>
-        <version>${cxf.version}</version>
-        <scope>test</scope>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jcl-over-slf4j</artifactId>
+        <version>${slf4j.version}</version>
+        <scope>runtime</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-core</artifactId>
+        <version>${spring.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-beans</artifactId>
+        <version>${spring.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-context</artifactId>
+        <version>${spring.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.springframework</groupId>
@@ -95,34 +166,92 @@
       </dependency>
       <dependency>
         <groupId>org.springframework</groupId>
-        <artifactId>spring-beans</artifactId>
+        <artifactId>spring-aop</artifactId>
         <version>${spring.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.springframework</groupId>
-        <artifactId>spring-context</artifactId>
-        <version>${spring.version}</version>
+        <groupId>javax.mail</groupId>
+        <artifactId>mail</artifactId>
+        <version>1.4.4</version>
       </dependency>
       <dependency>
-        <groupId>org.infinispan</groupId>
-        <artifactId>infinispan-core</artifactId>
-        <version>5.2.0.Final</version>
+        <groupId>com.sun.grizzly</groupId>
+        <artifactId>grizzly-servlet-webserver</artifactId>
+        <version>1.9.57</version>
       </dependency>
       <dependency>
-        <groupId>org.jgroups</groupId>
-        <artifactId>jgroups</artifactId>
-        <version>3.2.6.Final</version>
+        <groupId>com.sun.jersey</groupId>
+        <artifactId>jersey-grizzly</artifactId>
+        <version>${jersey.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
-        <version>${slf4j.version}</version>
+        <groupId>com.sun.jersey</groupId>
+        <artifactId>jersey-core</artifactId>
+        <version>${jersey.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>jcl-over-slf4j</artifactId>
-        <version>${slf4j.version}</version>
-        <scope>runtime</scope>
+        <groupId>com.sun.jersey.contribs</groupId>
+        <artifactId>jersey-multipart</artifactId>
+        <version>${jersey.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.jersey.contribs</groupId>
+        <artifactId>jersey-spring</artifactId>
+        <version>${jersey.version}</version>
+      </dependency>
+
+      <!-- sesame/openrdf dependencies that were previously provided by the Aduna 
+        Maven repo -->
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-model</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-rio-api</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-rio-ntriples</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-rio-rdfxml</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-rio-trix</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-rio-turtle</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-repository-api</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-repository-sail</artifactId>
+        <version>${sesame.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.openrdf.sesame</groupId>
+        <artifactId>sesame-sail-memory</artifactId>
+        <version>${sesame.version}</version>
       </dependency>
 
       <!-- test gear -->
@@ -131,6 +260,19 @@
         <artifactId>junit</artifactId>
         <version>4.11</version>
         <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>4.2.3</version>
+<!--         commented out since fcrepo-webhooks uses httpclient at compile time -->
+<!--         <scope>test</scope> -->
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -151,16 +293,14 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.2.3</version>
-        <scope>test</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
+        <groupId>org.powermock</groupId>
+        <artifactId>powermock-module-junit4</artifactId>
+        <version>${powermock.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.powermock</groupId>
+        <artifactId>powermock-api-mockito</artifactId>
+        <version>${powermock.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -168,6 +308,26 @@
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>com.github.github</groupId>
+          <artifactId>site-maven-plugin</artifactId>
+          <version>0.7</version>
+          <configuration>
+            <message>Creating site for ${project.artifactId}, ${project.version}</message>
+            <!-- this does the trick to place every module in the correct subfolder -->
+            <path>${project.distributionManagement.site.url}</path>
+            <merge>true</merge>
+          </configuration>
+          <executions>
+            <execution>
+              <id>github</id>
+              <goals>
+                <goal>site</goal>
+              </goals>
+              <phase>site-deploy</phase>
+            </execution>
+          </executions>
+        </plugin>
         <plugin>
           <groupId>org.apache.felix</groupId>
           <artifactId>maven-bundle-plugin</artifactId>
@@ -189,7 +349,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>2.5.1</version>
+          <version>2.6</version>
         </plugin>
         <plugin>
           <artifactId>maven-deploy-plugin</artifactId>
@@ -198,10 +358,59 @@
         <plugin>
           <artifactId>maven-enforcer-plugin</artifactId>
           <version>1.2</version>
+          <executions>
+            <execution>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <bannedDependencies>
+                    <searchTransitive>true</searchTransitive>
+                    <excludes>
+                      <exclude>commons-logging</exclude>
+                      <exclude>log4j:log4j</exclude>
+                      <exclude>org.slf4j:slf4j-jcl</exclude>
+                      <exclude>org.slf4j:slf4j-jdk14</exclude>
+                      <exclude>org.slf4j:slf4j-log4j12</exclude>
+                      <exclude>org.slf4j:slf4j-log4j13</exclude>
+                      <exclude>org.slf4j:slf4j-nop</exclude>
+                      <exclude>org.slf4j:slf4j-simple</exclude>
+                      <exclude>org.apache.cxf</exclude>
+                    </excludes>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>2.14</version>
+          <configuration>
+            <systemPropertyVariables>
+              <test.port>${test.port}</test.port>
+              <test.context.path>${test.context.path}</test.context.path>
+            </systemPropertyVariables>
+          </configuration>
+          <executions>
+            <execution>
+              <id>integration-test</id>
+              <goals>
+                <goal>integration-test</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>verify</id>
+              <goals>
+                <goal>verify</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
-          <version>2.3.1</version>
+          <version>2.4</version>
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
@@ -209,25 +418,83 @@
         </plugin>
         <plugin>
           <artifactId>maven-release-plugin</artifactId>
-          <version>2.3.2</version>
+          <version>2.4</version>
+          <configuration>
+            <!-- see http://jira.codehaus.org/browse/MRELEASE-424 -->
+            <mavenExecutorId>forked-path</mavenExecutorId>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.scm</groupId>
+              <artifactId>maven-scm-provider-gitexe</artifactId>
+              <version>1.8.1</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <artifactId>maven-resources-plugin</artifactId>
-          <version>2.5</version>
+          <version>2.6</version>
         </plugin>
         <plugin>
           <artifactId>maven-site-plugin</artifactId>
-          <version>3.1</version>
+          <version>3.2</version>
+          <configuration>
+            <skipDeploy>true</skipDeploy>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <!-- allows markdown syntax for site generation. To use it place files 
+                below src/site/markdown/[filename].md -->
+              <groupId>org.apache.maven.doxia</groupId>
+              <artifactId>doxia-module-markdown</artifactId>
+              <version>1.3</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.12.3</version>
+          <version>2.14</version>
         </plugin>
         <plugin>
           <artifactId>maven-war-plugin</artifactId>
           <version>2.2</version>
           <configuration>
             <failOnMissingWebXml>false</failOnMissingWebXml>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.enunciate</groupId>
+          <artifactId>maven-enunciate-cxf-plugin</artifactId>
+          <version>1.26.2</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>build-helper-maven-plugin</artifactId>
+          <version>1.8</version>
+          <!-- reserve a port under the property ${test.port} for integration tests -->
+          <configuration>
+            <portNames>
+              <portName>test.port</portName>
+            </portNames>
+          </configuration>
+          <executions>
+            <execution>
+              <id>reserve-port</id>
+              <phase>pre-integration-test</phase>
+              <goals>
+                <goal>reserve-network-port</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>cobertura-maven-plugin</artifactId>
+          <version>2.5.2</version>
+          <configuration>
+            <aggregate>true</aggregate>
+            <forceMojoExecution>true</forceMojoExecution>
+            <inherited>true</inherited>
           </configuration>
         </plugin>
         <plugin>
@@ -267,19 +534,6 @@
                 </pluginExecution>
                 <pluginExecution>
                   <pluginExecutionFilter>
-                    <groupId>org.codehaus.enunciate</groupId>
-                    <artifactId>maven-enunciate-cxf-plugin</artifactId>
-                    <versionRange>[1.26.2,)</versionRange>
-                    <goals>
-                      <goal>docs</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <execute />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-enforcer-plugin</artifactId>
                     <versionRange>[1.0.0,)</versionRange>
@@ -295,145 +549,132 @@
             </lifecycleMappingMetadata>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>org.mortbay.jetty</groupId>
+          <artifactId>jetty-maven-plugin</artifactId>
+          <version>8.1.10.v20130312</version>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
+      <plugin>
+        <groupId>com.github.github</groupId>
+        <artifactId>site-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>maven-bundle-plugin</artifactId>
+      </plugin>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
       </plugin>
       <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <bannedDependencies>
-                  <searchTransitive>true</searchTransitive>
-                  <excludes>
-                    <exclude>commons-logging</exclude>
-                    <exclude>log4j:log4j</exclude>
-                    <exclude>org.slf4j:slf4j-jcl</exclude>
-                    <exclude>org.slf4j:slf4j-jdk14</exclude>
-                    <exclude>org.slf4j:slf4j-log4j12</exclude>
-                    <exclude>org.slf4j:slf4j-log4j13</exclude>
-                    <exclude>org.slf4j:slf4j-nop</exclude>
-                    <exclude>org.slf4j:slf4j-simple</exclude>
-                  </excludes>
-                </bannedDependencies>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <artifactId>maven-release-plugin</artifactId>
-        <configuration>
-          <!-- see http://jira.codehaus.org/browse/MRELEASE-424 -->
-          <mavenExecutorId>forked-path</mavenExecutorId>
-        </configuration>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.maven.scm</groupId>
-            <artifactId>maven-scm-provider-gitexe</artifactId>
-            <version>1.7</version>
-          </dependency>
-        </dependencies>
       </plugin>
       <plugin>
         <artifactId>maven-site-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>cobertura-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>2.14</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.9</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jxr-plugin</artifactId>
+        <version>2.3</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-report-plugin</artifactId>
+        <version>2.14</version>
         <configuration>
-          <reportPlugins>
-            <plugin>
-              <artifactId>maven-failsafe-plugin</artifactId>
-            </plugin>
-            <plugin>
-              <artifactId>maven-javadoc-plugin</artifactId>
-            </plugin>
-            <plugin>
-              <artifactId>maven-jxr-plugin</artifactId>
-            </plugin>
-            <plugin>
-              <artifactId>maven-surefire-report-plugin</artifactId>
-              <configuration>
-                <outputName>surefire-report</outputName>
-                <aggregate>true</aggregate>
-                <reportsDirectories>
-                  <reportsDirectory>${project.build.directory}/surefire-reports/</reportsDirectory>
-                  <reportsDirectory>${project.build.directory}/failsafe-reports/</reportsDirectory>
-                </reportsDirectories>
-              </configuration>
-            </plugin>
-            <plugin>
-              <artifactId>maven-changelog-plugin</artifactId>
-              <version>2.2</version>
-              <configuration>
-                <displayFileDetailUrl>http://github.com/mediashelf/${project_name}/blob/master/%FILE% </displayFileDetailUrl>
-              </configuration>
-            </plugin>
-            <plugin>
-              <artifactId>maven-project-info-reports-plugin</artifactId>
-              <configuration>
-                <dependencyLocationsEnabled>false</dependencyLocationsEnabled>
-                <dependencyDetailsEnabled>false</dependencyDetailsEnabled>
-              </configuration>
-            </plugin>
-            <plugin>
-              <groupId>org.codehaus.mojo</groupId>
-              <artifactId>cobertura-maven-plugin</artifactId>
-              <version>2.5.1</version>
-              <configuration>
-                <aggregate>true</aggregate>
-              </configuration>
-            </plugin>
-            <plugin>
-              <groupId>org.codehaus.mojo</groupId>
-              <artifactId>versions-maven-plugin</artifactId>
-              <version>1.3.1</version>
-              <reportSets>
-                <reportSet>
-                  <reports>
-                    <report>dependency-updates-report</report>
-                    <report>plugin-updates-report</report>
-                    <report>property-updates-report</report>
-                  </reports>
-                </reportSet>
-              </reportSets>
-            </plugin>
-          </reportPlugins>
+          <outputName>surefire-report</outputName>
+          <aggregate>true</aggregate>
+          <reportsDirectories>
+            <reportsDirectory>${project.build.directory}/surefire-reports/</reportsDirectory>
+            <reportsDirectory>${project.build.directory}/failsafe-reports/</reportsDirectory>
+          </reportsDirectories>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-changelog-plugin</artifactId>
+        <version>2.2</version>
+        <configuration>
+          <displayFileDetailUrl>http://github.com/mediashelf/${project_name}/blob/master/%FILE% </displayFileDetailUrl>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>2.6</version>
+        <configuration>
+          <dependencyLocationsEnabled>false</dependencyLocationsEnabled>
+          <dependencyDetailsEnabled>false</dependencyDetailsEnabled>
         </configuration>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>cobertura-maven-plugin</artifactId>
-        <version>2.5.1</version>
+        <version>2.5.2</version>
         <configuration>
           <aggregate>true</aggregate>
+          <forceMojoExecution>true</forceMojoExecution>
+          <inherited>true</inherited>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>versions-maven-plugin</artifactId>
+        <version>2.0</version>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <report>dependency-updates-report</report>
+              <report>plugin-updates-report</report>
+              <report>property-updates-report</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
     </plugins>
-    <extensions>
-      <extension>
-        <groupId>org.apache.maven.scm</groupId>
-        <artifactId>maven-scm-provider-gitexe</artifactId>
-        <version>1.6</version>
-      </extension>
-      <extension>
-        <groupId>org.apache.maven.scm</groupId>
-        <artifactId>maven-scm-manager-plexus</artifactId>
-        <version>1.7</version>
-      </extension>
-      <extension>
-        <groupId>com.github.stephenc.wagon</groupId>
-        <artifactId>wagon-gitsite</artifactId>
-        <version>0.4.1</version>
-      </extension>
-    </extensions>
-  </build>
+  </reporting>
 
   <repositories>
+    <repository>
+      <id>fcrepo-snapshot</id>
+      <name>Fcrepo Snapshot Repository</name>
+      <url>http://maven.fcrepo.org/nexus/content/repositories/snapshots/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>fcrepo-thirdparty</id>
+      <name>Fcrepo Thirdparty Repository</name>
+      <url>http://maven.fcrepo.org/nexus/content/repositories/thirdparty/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
     <repository>
       <id>jboss-public-repository-group</id>
       <name>JBoss Public Maven Repository Group</name>
@@ -450,16 +691,21 @@
       <id>maven2-repository.dev.java.net</id>
       <name>Java.net Repository for Maven</name>
       <url>http://download.java.net/maven/2/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
     </repository>
   </repositories>
 
   <scm>
-    <connection>scm:git:git://github.com/mediashelf/${project_name}.git
+    <connection>scm:git:git://github.com/futures/${project_name}.git
     </connection>
-    <developerConnection>scm:git:git@github.com:mediashelf/${project_name}.git
+    <developerConnection>scm:git:git@github.com:futures/${project_name}.git
     </developerConnection>
-    <url>http://github.com/mediashelf/${project_name}</url>
-    <tag>HEAD</tag>
+    <url>https://github.com/futures/${project_name}</url>
   </scm>
 
   <prerequisites>
@@ -502,25 +748,16 @@
     <license>
       <name>Apache License, Version 2.0</name>
       <url>http://www.apache.org/licenses/LICENSE-2.0</url>
-      <comments>Copyright (c) 2012 DuraSpace</comments>
+      <comments>Copyright (c) 2013 DuraSpace</comments>
     </license>
   </licenses>
 
   <distributionManagement>
     <site>
       <id>gh-pages</id>
-      <url>gitsite:git@github.com/futures/${project_name}.git</url>
+      <name>Deployment through GitHub's site deployment plugin</name>
+      <url>site/${project.version}</url>
     </site>
-    <repository>
-      <id>fedora4lib-releases</id>
-      <name>fedora4lib Nexus Repo</name>
-      <url>http://maven.fedora4lib.org:8081/nexus/content/repositories/releases/</url>
-    </repository>
-    <snapshotRepository>
-      <id>fedora4lib-snapshots</id>
-      <name>fedora4lib Nexus Repo</name>
-      <url>http://maven.fedora4lib.org:8081/nexus/content/repositories/snapshots/</url>
-    </snapshotRepository>
   </distributionManagement>
 
   <developers>
@@ -587,6 +824,15 @@
       <timezone>-4</timezone>
     </developer>
     <developer>
+      <id>nigelgbanks</id>
+      <name>Nigel Banks</name>
+      <organization>Discovery Garden</organization>
+      <roles>
+        <role>developer</role>
+      </roles>
+      <timezone>+2</timezone>
+    </developer>
+    <developer>
       <id>anusharanganathan</id>
       <name>Anusha Ranganathan</name>
       <organization>Oxford University</organization>
@@ -595,6 +841,29 @@
       </roles>
       <timezone>+0</timezone>
     </developer>
+    <developer>
+      <id>escowles</id>
+      <name>Esmé Cowles</name>
+      <email>escowles @ (domain of organization url)</email>
+      <organization>UC San Diego</organization>
+      <organizationUrl>http://www.ucsd.edu/</organizationUrl>
+      <roles>
+        <role>developer</role>
+      </roles>
+      <timezone>-5</timezone>
+    </developer>
   </developers>
 
+  <dependencies>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-module-junit4</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.powermock</groupId>
+      <artifactId>powermock-api-mockito</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 </project>

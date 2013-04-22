@@ -1,15 +1,14 @@
+
 package org.fcrepo.api.legacy;
 
 import static com.google.common.collect.ImmutableSet.builder;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
-import static javax.ws.rs.core.MediaType.TEXT_PLAIN;
 import static javax.ws.rs.core.MediaType.TEXT_XML;
+import static javax.ws.rs.core.Response.created;
 import static javax.ws.rs.core.Response.ok;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
-import java.util.Map;
 
 import javax.jcr.NamespaceRegistry;
 import javax.jcr.RepositoryException;
@@ -22,13 +21,11 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.fcrepo.AbstractResource;
-import org.fcrepo.jaxb.responses.NamespaceListing;
-import org.fcrepo.jaxb.responses.NamespaceListing.Namespace;
+import org.fcrepo.jaxb.responses.management.NamespaceListing;
+import org.fcrepo.jaxb.responses.management.NamespaceListing.Namespace;
+import org.springframework.stereotype.Component;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
 
 /**
@@ -41,96 +38,108 @@ import com.google.common.collect.ImmutableSet.Builder;
  * @author ajs6f
  * 
  */
-@Path("/namespaces")
+@Path("/v3/namespaces")
+@Component("fedoraLegacyNamespaces")
 public class FedoraNamespaces extends AbstractResource {
 
-	@POST
-	@Path("/{ns}")
-	public Response registerObjectNamespace(@PathParam("ns") final String ns)
-			throws RepositoryException {
+    /**
+     * Creates a new namespace in the JCR for use in identifing objects.
+     * 
+     * @param prefix Prefix to use
+     * @param uri Uri to use
+     * @return 201
+     * @throws RepositoryException
+     */
+    @POST
+    @Path("/{prefix}")
+    public Response registerObjectNamespace(@PathParam("prefix")
+    final String prefix, final String uri) throws RepositoryException {
 
-		final Session session = repo.login();
-		final NamespaceRegistry r = session.getWorkspace()
-				.getNamespaceRegistry();
-		r.registerNamespace(ns, "info:fedora/" + ns);
-		session.logout();
-		return Response.ok().entity(ns).build();
-	}
+        final Session session = getAuthenticatedSession();
+        try {
+            final NamespaceRegistry r =
+                    session.getWorkspace().getNamespaceRegistry();
+            r.registerNamespace(prefix, uri);
+        } finally {
+            session.logout();
+        }
+        return created(uriInfo.getAbsolutePath()).build();
+    }
 
-	@GET
-	@Path("/{ns}")
-	@Produces(APPLICATION_JSON)
-	public Response retrieveObjectNamespace(@PathParam("ns") final String prefix)
-			throws RepositoryException {
+    /**
+     * Register multiple object namespaces.
+     * 
+     * @param nses A set of namespaces in JAXB-specified format.
+     * @return 201
+     * @throws RepositoryException
+     */
+    @POST
+    @Consumes({TEXT_XML, APPLICATION_JSON})
+    public Response registerObjectNamespaces(final NamespaceListing nses)
+            throws RepositoryException {
 
-		final Session session = repo.login();
-		final NamespaceRegistry r = session.getWorkspace()
-				.getNamespaceRegistry();
+        final Session session = getAuthenticatedSession();
+        try {
+            final NamespaceRegistry r =
+                    session.getWorkspace().getNamespaceRegistry();
+            for (Namespace ns : nses.namespaces) {
+                r.registerNamespace(ns.prefix, ns.uri.toString());
+            }
+        } finally {
+            session.logout();
+        }
+        return created(uriInfo.getAbsolutePath()).build();
+    }
 
-		if (ImmutableSet.copyOf(r.getPrefixes()).contains(prefix)) {
-			session.logout();
-			return ok("{ \"" + prefix + "\":\"" + r.getURI(prefix) + "\" }")
-					.build();
-		} else {
-			session.logout();
-			return four04;
-		}
-	}
+    /**
+     * Retrieve a namespace URI from a prefix.
+     * 
+     * @param prefix The prefix to search.
+     * @return A JAXB-specified format Namespace.
+     * @throws RepositoryException
+     */
+    @GET
+    @Path("/{prefix}")
+    @Produces(APPLICATION_JSON)
+    public Response retrieveObjectNamespace(@PathParam("ns")
+    final String prefix) throws RepositoryException {
 
-	@POST
-	@Path("")
-	@Consumes(APPLICATION_JSON)
-	public Response registerObjectNamespaceJSON(final InputStream message)
-			throws RepositoryException, JsonParseException,
-			JsonMappingException, IOException {
+        final Session session = getAuthenticatedSession();
+        final NamespaceRegistry r =
+                session.getWorkspace().getNamespaceRegistry();
 
-		final Session session = repo.login();
-		final NamespaceRegistry r = session.getWorkspace()
-				.getNamespaceRegistry();
+        try {
+            final Namespace ns =
+                    new Namespace(prefix, URI.create(r.getURI(prefix)));
 
-		@SuppressWarnings("unchecked")
-		final Map<String, String> nses = mapper.readValue(message, Map.class);
-		for (final Map.Entry<String, String> entry : nses.entrySet()) {
-			r.registerNamespace(entry.getKey(), entry.getValue());
-		}
-		session.logout();
-		return ok(nses).build();
-	}
+            return ok(ns).build();
+        } finally {
+            session.logout();
+        }
+    }
 
-	@GET
-	@Path("")
-	@Produces(TEXT_PLAIN)
-	public Response getObjectNamespaces() throws RepositoryException {
+    /**
+     * @return
+     * @throws RepositoryException
+     * @throws IOException
+     */
+    @GET
+    @Produces({TEXT_XML, APPLICATION_JSON})
+    public NamespaceListing getNamespaces() throws RepositoryException,
+            IOException {
+        final Builder<Namespace> b = builder();
+        final Session session = getAuthenticatedSession();
+        try {
+            final NamespaceRegistry r =
+                    session.getWorkspace().getNamespaceRegistry();
 
-		final Session session = repo.login();
-		final NamespaceRegistry r = session.getWorkspace()
-				.getNamespaceRegistry();
-
-		StringBuffer out = new StringBuffer();
-		String[] uris = r.getURIs();
-		String[] prefixes = r.getPrefixes();
-		for (int i = 0; i < uris.length; i++) {
-			out.append(prefixes[i] + " : " + uris[i] + "\n");
-		}
-		session.logout();
-		return ok(out.toString()).build();
-	}
-
-	@GET
-	@Path("")
-	@Produces({ TEXT_XML, APPLICATION_JSON })
-	public NamespaceListing getObjectNamespacesInXML()
-			throws RepositoryException, IOException {
-
-		final Session session = repo.login();
-		final NamespaceRegistry r = session.getWorkspace()
-				.getNamespaceRegistry();
-		final Builder<Namespace> b = builder();
-		for (final String prefix : r.getPrefixes()) {
-			b.add(new Namespace(prefix, URI.create(r.getURI(prefix))));
-		}
-		session.logout();
-		return new NamespaceListing(b.build());
-	}
+            for (final String prefix : r.getPrefixes()) {
+                b.add(new Namespace(prefix, URI.create(r.getURI(prefix))));
+            }
+        } finally {
+            session.logout();
+        }
+        return new NamespaceListing(b.build());
+    }
 
 }

@@ -1,78 +1,164 @@
+
 package org.fcrepo.services;
 
-import org.modeshape.jcr.api.JcrTools;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.fcrepo.services.PathService.getDatastreamJcrNodePath;
+import static org.fcrepo.services.PathService.getObjectJcrNodePath;
+import static org.slf4j.LoggerFactory.getLogger;
 
-import javax.inject.Inject;
-import javax.jcr.Node;
-import javax.jcr.Property;
-import javax.jcr.Repository;
-import javax.jcr.RepositoryException;
-import javax.jcr.Session;
-import javax.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.util.Calendar;
 
-import static org.modeshape.jcr.api.JcrConstants.*;
+import javax.jcr.Node;
+import javax.jcr.RepositoryException;
+import javax.jcr.Session;
 
+import org.fcrepo.Datastream;
+import org.fcrepo.FedoraObject;
+import org.fcrepo.exception.InvalidChecksumException;
+import org.fcrepo.utils.DatastreamIterator;
+import org.slf4j.Logger;
 
-public class DatastreamService {
+/**
+ * Service for creating and retrieving Datastreams without using the JCR API.
+ * 
+ * @author cbeer
+ *
+ */
+public class DatastreamService extends RepositoryService {
 
-    private static final Logger logger = LoggerFactory
-            .getLogger(DatastreamService.class);
+    private static final Logger logger = getLogger(DatastreamService.class);
 
-    @Inject
-    private Repository repo;
+    /**
+     * Create a new Datastream node in the JCR store
+     * @param session the jcr session to use
+     * @param dsPath the absolute path to put the datastream
+     * @param contentType the mime-type for the requestBodyStream
+     * @param requestBodyStream binary payload for the datastream
+     * @return
+     * @throws RepositoryException
+     * @throws IOException
+     * @throws InvalidChecksumException
+     */
+    public Node createDatastreamNode(final Session session,
+            final String dsPath, final String contentType,
+            final InputStream requestBodyStream) throws RepositoryException,
+            IOException, InvalidChecksumException {
 
-    private JcrTools jcrTools = new JcrTools();
-
-    public Node createDatastreamNode(final Session session, final String dsPath, final MediaType contentType, final InputStream requestBodyStream) throws RepositoryException, IOException {
-
-        final Node ds = jcrTools.findOrCreateNode(session, dsPath, NT_FILE);
-        ds.addMixin("fedora:datastream");
-
-        final Node contentNode = jcrTools.findOrCreateChild(ds, JCR_CONTENT,
-                NT_RESOURCE);
-        logger.debug("Created content node at path: " + contentNode.getPath());
-		/*
-		 * This next line of code deserves explanation. If we chose for the
-		 * simpler line:
-		 *
-		 * Property dataProperty = contentNode.setProperty(JCR_DATA,
-		 * requestBodyStream);
-		 *
-		 * then the JCR would not block on the stream's completion, and we would
-		 * return to the requestor before the mutation to the repo had actually
-		 * completed. So instead we use createBinary(requestBodyStream), because
-		 * its contract specifies:
-		 *
-		 * "The passed InputStream is closed before this method returns either
-		 * normally or because of an exception."
-		 *
-		 * which lets us block and not return until the job is done! The simpler
-		 * code may still be useful to us for an asychronous method that we
-		 * develop later.
-		 */
-        Property dataProperty = contentNode.setProperty(JCR_DATA, session
-                .getValueFactory().createBinary(requestBodyStream));
-        logger.debug("Created data property at path: " + dataProperty.getPath());
-
-        ds.setProperty("fedora:contentType", contentType.toString());
-
-        ds.addMixin("fedora:owned");
-        ds.setProperty("fedora:ownerId", session.getUserID());
-
-        if(!ds.hasProperty("fedora:created")) {
-            ds.setProperty("fedora:created", Calendar.getInstance());
-        }
-        ds.setProperty("jcr:lastModified", Calendar.getInstance());
-
-        // TODO: I guess we should also have the PID + DSID..
-        ds.setProperty("dc:identifier", new String[] { ds.getIdentifier(), ds.getParent().getName() + "/" + ds.getName() });
-
-        return ds;
+        return createDatastreamNode(session, dsPath, contentType,
+                requestBodyStream, null, null);
     }
+
+    /**
+     * Create a new Datastream node in the JCR store
+     * @param session the jcr session to use
+     * @param dsPath the absolute path to put the datastream
+     * @param contentType the mime-type for the requestBodyStream
+     * @param requestBodyStream binary payload for the datastream
+     * @param checksumType digest algorithm used to calculate the checksum
+     * @param checksum the digest for the binary payload
+     * @return
+     * @throws RepositoryException
+     * @throws IOException
+     * @throws InvalidChecksumException
+     */
+    public Node createDatastreamNode(final Session session,
+            final String dsPath, final String contentType,
+            final InputStream requestBodyStream, final String checksumType,
+            final String checksum) throws RepositoryException, IOException,
+            InvalidChecksumException {
+
+        final Datastream ds = new Datastream(session, dsPath);
+        final Node result = ds.getNode();
+        ds.setContent(requestBodyStream, contentType, checksumType, checksum);
+        return result;
+    }
+
+    /**
+     * retrieve the JCR node for a Datastream by pid and dsid
+     * @param pid object persistent identifier
+     * @param dsId datastream identifier
+     * @return
+     * @throws RepositoryException
+     */
+    public Node getDatastreamNode(final String pid, final String dsId)
+            throws RepositoryException {
+        logger.trace("Executing getDatastreamNode() with pid: {} and dsId: {}",
+                pid, dsId);
+        final Node dsNode = getDatastream(pid, dsId).getNode();
+        logger.trace("Retrieved datastream node: {}", dsNode.getName());
+        return dsNode;
+    }
+
+    /**
+     * Retrieve a Datastream instance by pid and dsid
+     * @param pid object persistent identifier
+     * @param dsId datastream identifier
+     * @return
+     * @throws RepositoryException
+     */
+    public Datastream getDatastream(final String pid, final String dsId)
+            throws RepositoryException {
+        return new Datastream(readOnlySession, pid, dsId);
+    }
+
+    /**
+     * Delete a Datastream
+     * @param session jcr session
+     * @param pid object persistent identifier
+     * @param dsId datastream identifier
+     * @throws RepositoryException
+     */
+    public void purgeDatastream(final Session session, final String pid,
+            final String dsId) throws RepositoryException {
+        new Datastream(session, pid, dsId).purge();
+    }
+
+    /**
+     * @param pid object persistent identifier
+     * @param session jcr session
+     * @return an iterator of the Datastream objects for a FedoraObject
+     * @throws RepositoryException
+     */
+    public DatastreamIterator getDatastreamsFor(final String pid,
+            final Session session) throws RepositoryException {
+        return new DatastreamIterator(new FedoraObject(session,
+                getObjectJcrNodePath(pid)).getNode().getNodes());
+    }
+
+    /**
+     * Get
+     * @param pid FedoraObject persistent identifier
+     * @return a read-only iterator of Datastream objects for a FedoraObject
+     * @throws RepositoryException
+     */
+    public DatastreamIterator getDatastreamsFor(final String pid)
+            throws RepositoryException {
+        return getDatastreamsFor(pid, readOnlySession);
+    }
+
+    /**
+     * Check if a datastream exists in the repository
+     * @param pid object persistent identifier
+     * @param dsId datastream identifier
+     * @return
+     * @throws RepositoryException
+     */
+    public boolean exists(final String pid, final String dsId)
+            throws RepositoryException {
+        return exists(pid, dsId, readOnlySession);
+    }
+
+    /**
+     * Check if a datastream exists in the repository
+     * @param pid object persistent identifier
+     * @param dsId datastream identifier
+     * @param session jcr session
+     * @return
+     * @throws RepositoryException
+     */
+    public boolean exists(final String pid, final String dsId,
+            final Session session) throws RepositoryException {
+        return session.nodeExists(getDatastreamJcrNodePath(pid, dsId));
+    }
+
 }

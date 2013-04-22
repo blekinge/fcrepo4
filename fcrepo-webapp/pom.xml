@@ -11,6 +11,11 @@
   <packaging>war</packaging>
   <name>fcrepo webapp</name>
 
+  <properties>
+    <!-- integration test properties -->
+    <test.context.path>/</test.context.path>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.fcrepo</groupId>
@@ -32,7 +37,19 @@
     </dependency>
     <dependency>
       <groupId>org.fcrepo</groupId>
-      <artifactId>fcrepo-dc</artifactId>
+      <artifactId>fcrepo-generator-dc</artifactId>
+      <version>${project.version}</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.fcrepo</groupId>
+      <artifactId>fcrepo-generator-rdf</artifactId>
+      <version>${project.version}</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.fcrepo</groupId>
+      <artifactId>fcrepo-http-api</artifactId>
       <version>${project.version}</version>
       <scope>compile</scope>
     </dependency>
@@ -41,6 +58,10 @@
       <artifactId>fcrepo-legacy-api</artifactId>
       <version>${project.version}</version>
       <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.sun.jersey.contribs</groupId>
+      <artifactId>jersey-spring</artifactId>
     </dependency>
     <dependency>
       <groupId>org.modeshape</groupId>
@@ -53,25 +74,91 @@
         </exclusion>
       </exclusions>
     </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+    </dependency>
+
+    <!-- test gear -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+    </dependency>
 
   </dependencies>
 
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-war-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <test.port>${test.port}</test.port>
+            <test.context.path>${test.context.path}</test.context.path>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <configuration>
+          <portNames>
+            <portName>test.port</portName>
+            <!-- reserves the stop port for jetty-maven-plugin -->
+            <portName>jetty.port.stop</portName>
+          </portNames>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.mortbay.jetty</groupId>
         <artifactId>jetty-maven-plugin</artifactId>
-        <version>8.1.9.v20130131</version>
         <configuration>
+          <loginServices>
+            <loginService implementation="org.eclipse.jetty.security.HashLoginService">
+              <name>fcrepo</name>
+              <config>${project.build.directory}/test-classes/jetty-users.properties</config>
+            </loginService>
+          </loginServices>
           <scanIntervalSeconds>2</scanIntervalSeconds>
+          <stopKey>STOP</stopKey>
           <webApp>
-            <contextPath>/</contextPath>
+            <contextPath>${test.context.path}</contextPath>
           </webApp>
         </configuration>
+        <executions>
+          <execution>
+            <id>start-jetty</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>stop</goal>
+              <goal>start</goal>
+            </goals>
+            <configuration>
+              <connectors>
+                <connector
+                  implementation="org.eclipse.jetty.server.nio.SelectChannelConnector">
+                  <port>${test.port}</port>
+                  <maxIdleTime>60000</maxIdleTime>
+                </connector>
+              </connectors>
+              <daemon>true</daemon>
+              <stopPort>${jetty.port.stop}</stopPort>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stop-jetty</id>
+            <phase>post-integration-test</phase>
+            <goals>
+              <goal>stop</goal>
+            </goals>
+            <configuration>
+              <stopPort>${jetty.port.stop}</stopPort>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
