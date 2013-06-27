@@ -1,35 +1,75 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static com.hp.hpl.jena.rdf.model.ResourceFactory.createResource;
+import static org.fcrepo.RdfLexicon.HAS_MEMBER_OF_RESULT;
+import static org.fcrepo.test.util.PathSegmentImpl.createPathList;
+import static org.fcrepo.test.util.TestHelpers.getUriInfoImpl;
+import static org.fcrepo.test.util.TestHelpers.mockSession;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.slf4j.LoggerFactory.getLogger;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+
+import javax.jcr.Node;
+import javax.jcr.RepositoryException;
+import javax.jcr.Session;
+import javax.ws.rs.core.UriInfo;
 
 import org.fcrepo.identifiers.PidMinter;
-import org.fcrepo.jaxb.responses.management.NextPid;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.slf4j.Logger;
 
 import com.google.common.base.Function;
+import com.hp.hpl.jena.query.Dataset;
 
 public class FedoraIdentifiersTest {
 
-    @Mock
+    private static final Logger LOGGER = getLogger(FedoraIdentifiersTest.class);
+
     private PidMinter mockPidMinter;
 
-    @InjectMocks
-    private final FedoraIdentifiers fi = new FedoraIdentifiers();
+    private FedoraIdentifiers testObj;
+
+    private UriInfo uriInfo;
+
+    private Session mockSession;
 
     @Before
-    public void initMocks() {
-        MockitoAnnotations.initMocks(this);
+    public void initMocks() throws RepositoryException {
+        testObj = new FedoraIdentifiers();
+
+        mockPidMinter = mock(PidMinter.class);
+
+        mockSession = mockSession(testObj);
+        testObj.setSession(mockSession);
+        uriInfo = getUriInfoImpl();
+        testObj.setUriInfo(uriInfo);
+
     }
 
     @Test
-    public void testGetNextPid() {
+    public void testGetNextPidAtRoot() throws RepositoryException,
+        URISyntaxException {
         when(mockPidMinter.makePid()).thenReturn(
                 new Function<Object, String>() {
 
@@ -39,13 +79,53 @@ public class FedoraIdentifiersTest {
                     }
                 });
 
-        final NextPid np = fi.getNextPid(2);
+        testObj.setPidMinter(mockPidMinter);
 
-        assertNotNull(np);
+        when(uriInfo.getAbsolutePath()).thenReturn(
+                new URI("http://localhost/fcrepo/fcr:pid"));
 
-        for (final String pid : np.pids) {
-            assertEquals("Wrong pid value!", "asdf:123", pid);
-        }
+        Node mockNode = mock(Node.class);
+        when(mockNode.getPath()).thenReturn("/asdf:123");
+        when(mockSession.getNode("/asdf:123")).thenReturn(mockNode);
+
+        final Dataset np = testObj.getNextPid(createPathList(""), 2, uriInfo);
+
+        LOGGER.debug("Got dataset {}", np.getDefaultModel().toString());
+        assertTrue(np.getDefaultModel().contains(
+                createResource("http://localhost/fcrepo/fcr:pid"),
+                HAS_MEMBER_OF_RESULT,
+                createResource("http://localhost/fcrepo/asdf:123")));
+
+    }
+
+    @Test
+    public void testGetNextPid() throws RepositoryException, URISyntaxException {
+        when(mockPidMinter.makePid()).thenReturn(
+                new Function<Object, String>() {
+
+                    @Override
+                    public String apply(final Object input) {
+                        return "asdf:123";
+                    }
+                });
+
+        testObj.setPidMinter(mockPidMinter);
+
+        when(uriInfo.getAbsolutePath()).thenReturn(
+                new URI("http://localhost/fcrepo/objects/fcr:pid"));
+
+        Node mockNode = mock(Node.class);
+        when(mockNode.getPath()).thenReturn("/objects/asdf:123");
+        when(mockSession.getNode("/objects/asdf:123")).thenReturn(mockNode);
+
+        final Dataset np =
+                testObj.getNextPid(createPathList("objects"), 2, uriInfo);
+
+        LOGGER.debug("Got dataset {}", np.getDefaultModel().toString());
+        assertTrue(np.getDefaultModel().contains(
+                createResource("http://localhost/fcrepo/objects/fcr:pid"),
+                HAS_MEMBER_OF_RESULT,
+                createResource("http://localhost/fcrepo/objects/asdf:123")));
 
     }
 }

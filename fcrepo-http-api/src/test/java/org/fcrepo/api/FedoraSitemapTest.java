@@ -1,21 +1,32 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.api;
 
-import static org.fcrepo.api.TestHelpers.getUriInfoImpl;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import javax.jcr.LoginException;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.core.SecurityContext;
 
 import org.fcrepo.jaxb.responses.sitemap.SitemapIndex;
 import org.fcrepo.services.ObjectService;
-import org.fcrepo.session.SessionFactory;
+import org.fcrepo.test.util.TestHelpers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,14 +44,9 @@ public class FedoraSitemapTest {
         mockObjects = mock(ObjectService.class);
         testObj = new FedoraSitemap();
         testObj.setObjectService(mockObjects);
-        mockSession = mock(Session.class);
-        final SessionFactory mockSessions = mock(SessionFactory.class);
-        when(mockSessions.getSession()).thenReturn(mockSession);
-        when(
-                mockSessions.getSession(any(SecurityContext.class),
-                        any(HttpServletRequest.class))).thenReturn(mockSession);
-        testObj.setSessionFactory(mockSessions);
-        testObj.setUriInfo(getUriInfoImpl());
+        mockSession = TestHelpers.mockSession(testObj);
+        testObj.setUriInfo(TestHelpers.getUriInfoImpl());
+        testObj.setSession(mockSession);
     }
 
     @After
@@ -50,8 +56,7 @@ public class FedoraSitemapTest {
 
     @Test
     public void testGetSitemapIndex() throws Exception {
-        when(mockObjects.getRepositoryObjectCount(mockSession)).thenReturn(
-                49999L);
+        when(mockObjects.getRepositoryObjectCount()).thenReturn(49999L);
 
         final SitemapIndex sitemapIndex = testObj.getSitemapIndex();
 
@@ -60,8 +65,7 @@ public class FedoraSitemapTest {
 
     @Test
     public void testGetSitemapIndexMultiplePages() throws Exception {
-        when(mockObjects.getRepositoryObjectCount(mockSession)).thenReturn(
-                50001L);
+        when(mockObjects.getRepositoryObjectCount()).thenReturn(50001L);
 
         final SitemapIndex sitemapIndex = testObj.getSitemapIndex();
 

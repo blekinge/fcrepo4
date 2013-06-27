@@ -7,11 +7,9 @@
     <version>4.0-SNAPSHOT</version>
   </parent>
   <artifactId>fcrepo-generator-dc</artifactId>
-  <name>fcrepo dc</name>
-
+  <name>${project.artifactId}</name>
+  <description>Fedora Dublin Core generator</description>
   <packaging>bundle</packaging>
-
-  <description>Dublin Core generator</description>
 
   <dependencies>
     <dependency>
@@ -34,13 +32,20 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
     </dependency>
-    
+
     <!-- test gear -->
     <dependency>
       <groupId>org.fcrepo</groupId>
       <artifactId>fcrepo-http-api</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.fcrepo</groupId>
+      <artifactId>fcrepo-http-api</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+      <type>test-jar</type>
     </dependency>
     <dependency>
       <groupId>org.fcrepo</groupId>
@@ -61,20 +66,24 @@
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
     </dependency>
-        <dependency>
+    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
-      <version>3.0.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.sun.grizzly</groupId>
-      <artifactId>grizzly-servlet-webserver</artifactId>
+      <groupId>org.glassfish.grizzly</groupId>
+      <artifactId>grizzly-http-server</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.grizzly</groupId>
+      <artifactId>grizzly-http-servlet</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.sun.jersey</groupId>
-      <artifactId>jersey-grizzly</artifactId>
+      <artifactId>jersey-grizzly2</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -82,22 +91,16 @@
       <artifactId>mail</artifactId>
       <scope>test</scope>
     </dependency>
-	<dependency>
-		<groupId>com.sun.jersey.contribs</groupId>
-		<artifactId>jersey-spring</artifactId>
-		<scope>test</scope>
-		<exclusions>
-			<exclusion>
-				<groupId>org.springframework</groupId>
-				<artifactId>spring-core</artifactId>
-			</exclusion>
-		</exclusions>
-	</dependency>
+    <dependency>
+      <groupId>com.sun.jersey.contribs</groupId>
+      <artifactId>jersey-spring</artifactId>
+      <scope>test</scope>
+    </dependency>
 
-    <!-- This dependency is for compile-time: it keeps this module independent 
-      of any given choice of JAX-RS implementation. It must be _after_ the test 
-      gear. Otherwise it will get loaded during test phase, but because this is 
-      just an API, the tests will not be able to execute. -->
+    <!-- This dependency is for compile-time: it keeps this module independent of 
+      any given choice of JAX-RS implementation. It must be _after_ the test gear. Otherwise 
+      it will get loaded during test phase, but because this is just an API, the tests 
+      will not be able to execute. -->
     <dependency>
       <groupId>javax</groupId>
       <artifactId>javaee-api</artifactId>
@@ -114,13 +117,22 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
       </plugin>
+      <!-- This maven-checkstyle-plugin is defined here as a stop-gap.
+      Once the checkstyle violations are resolved, this should be removed -->
       <plugin>
-        <groupId>org.codehaus.enunciate</groupId>
-        <artifactId>maven-enunciate-cxf-plugin</artifactId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>checkstyle</id>
+            <phase>none</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
-      	<groupId>org.apache.maven.plugins</groupId>
-      	<artifactId>maven-failsafe-plugin</artifactId>
+        <artifactId>maven-failsafe-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

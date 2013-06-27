@@ -12,13 +12,11 @@
 
     <bean name="modeshapeRepofactory"
           class="org.fcrepo.spring.ModeShapeRepositoryFactoryBean">
-      <property name="repositoryConfiguration" value="${fcrepo.modeshape.configuration:classpath:/config/repository.json}"/>
+      <property name="repositoryConfiguration" value="${fcrepo.modeshape.configuration:classpath:/config/single/repository.json}"/>
     </bean>
 
     <bean class="org.modeshape.jcr.JcrRepositoryFactory"/>
 
-    <bean class="org.fcrepo.services.ObjectService"/>
-    <bean class="org.fcrepo.services.DatastreamService"/>
-    <bean class="org.fcrepo.services.LowLevelStorageService"/>
-
+    <!-- For the time being, load annotation config here too -->
+    <bean class="org.fcrepo.metrics.MetricsConfig"/>
 </beans>

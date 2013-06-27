@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.integration.observer;
 
@@ -65,98 +80,9 @@ public class AtomJMSIT implements MessageListener {
 
     static Parser parser = new Abdera().getParser();
 
-    private Entry entry;
+    private volatile Entry entry;
 
     final private Logger logger = LoggerFactory.getLogger(AtomJMSIT.class);
-
-    @Test
-    public void testAtomStream() throws LoginException, RepositoryException {
-        Session session = repository.login();
-        session.getRootNode().addNode("test1").addMixin(FEDORA_OBJECT);
-        session.save();
-        session.logout();
-
-        // we're relying on the onMessage handler to populate entry
-        while (entry == null) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
-        List<Category> categories = copyOf(entry.getCategories("xsd:string"));
-        final String title = entry.getTitle();
-        entry = null;
-        String path = null;
-        for (Category cat : categories) {
-            if (cat.getLabel().equals("fedora-types:pid")) {
-                logger.debug("Found Category with term: " + cat.getTerm());
-                path = cat.getTerm();
-            }
-        }
-        assertEquals("Got wrong pid!", "test1", path);
-        assertEquals("Got wrong method!", "ingest", title);
-    }
-
-    @Test
-    public void testDatastreamTerm() throws NoSuchNodeTypeException,
-            VersionException, ConstraintViolationException, LockException,
-            ItemExistsException, PathNotFoundException, RepositoryException {
-        Session session = repository.login();
-        final Node object = session.getRootNode().addNode("test2");
-        object.addMixin(FEDORA_OBJECT);
-        final Node ds = object.addNode("DATASTREAM");
-        ds.addMixin(FEDORA_DATASTREAM);
-        ds.addNode(JCR_CONTENT).setProperty(JCR_DATA, "fake data");
-        session.save();
-        session.logout();
-
-        // we're relying on the onMessage handler to populate entry
-        while (entry == null) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        List<Category> categories = copyOf(entry.getCategories("xsd:string"));
-        entry = null;
-        String path = null;
-        for (Category cat : categories) {
-            if (cat.getLabel().equals("fedora-types:dsID")) {
-                logger.debug("Found Category with term: " + cat.getTerm());
-                path = cat.getTerm();
-            }
-        }
-        assertEquals("Got wrong datastream ID!", "DATASTREAM", path);
-        for (Category cat : categories) {
-            if (cat.getLabel().equals("fedora-types:pid")) {
-                logger.debug("Found Category with term: " + cat.getTerm());
-                path = cat.getTerm();
-            }
-        }
-        assertEquals("Got wrong object PID!", "test2", path);
-    }
-
-    @Override
-    public void onMessage(Message message) {
-        logger.debug("Received JMS message: " + message.toString());
-        TextMessage tMessage = (TextMessage) message;
-        try {
-        	if (LegacyMethod.canParse(message)){
-        		LegacyMethod legacy = new LegacyMethod(tMessage.getText());
-        		entry = legacy.getEntry();
-        		logger.debug("Parsed Entry: {}", entry.toString());
-        	} else {
-        		logger.warn("Could not parse message: {}", message);
-        	}
-        } catch (Exception e) {
-            logger.error("Exception receiving message: {}", e);
-            fail(e.getMessage());
-        }
-
-    }
 
     @Before
     public void acquireConnection() throws JMSException {
@@ -174,6 +100,121 @@ public class AtomJMSIT implements MessageListener {
         consumer.close();
         session.close();
         connection.close();
+    }
+
+    @Test
+    public void testAtomStream() throws LoginException, RepositoryException,
+        InterruptedException {
+        Session session = repository.login();
+        session.getRootNode().addNode("test1").addMixin(FEDORA_OBJECT);
+        session.save();
+
+        waitForEntry();
+
+        session.logout();
+
+        if (entry == null) fail("Waited a second, got no messages");
+        List<Category> categories = copyOf(entry.getCategories("xsd:string"));
+        final String title = entry.getTitle();
+        entry = null;
+        String path = null;
+        for (Category cat : categories) {
+            if (cat.getLabel().equals("fedora-types:pid")) {
+                logger.debug("Found Category with term: " + cat.getTerm());
+                path = cat.getTerm();
+            }
+        }
+        assertEquals("Got wrong pid!", "test1", path);
+        assertEquals("Got wrong method!", "ingest", title);
+    }
+
+    @Test
+    public void testDatastreamTerm() throws NoSuchNodeTypeException,
+        VersionException, ConstraintViolationException, LockException,
+        ItemExistsException, PathNotFoundException, RepositoryException,
+        InterruptedException {
+        logger.trace("BEGIN: testDatastreamTerm()");
+        Session session = repository.login();
+        final Node object = session.getRootNode().addNode("testDatastreamTerm");
+        object.addMixin(FEDORA_OBJECT);
+        session.save();
+        logger.trace("testDatastreamTerm called session.save()");
+
+        waitForEntry();
+        if (entry == null) fail("Waited a second, got no messages");
+        List<Category> categories = copyOf(entry.getCategories("xsd:string"));
+        entry = null;
+
+        String path = null;
+
+        logger.trace("Matched {} categories with scheme xsd:string", categories
+                .size());
+        for (Category cat : categories) {
+            if (cat.getLabel().equals("fedora-types:pid")) {
+                logger.debug("Found Category with term: " + cat.getTerm());
+                path = cat.getTerm();
+            }
+        }
+        assertEquals("Got wrong object PID!", "testDatastreamTerm", path);
+
+        final Node ds = object.addNode("DATASTREAM");
+        ds.addMixin(FEDORA_DATASTREAM);
+        ds.addNode(JCR_CONTENT).setProperty(JCR_DATA, "fake data");
+        session.save();
+        logger.trace("testDatastreamTerm called session.save()");
+        session.logout();
+        logger.trace("testDatastreamTerm called session.logout()");
+
+        waitForEntry();
+        if (entry == null) fail("Waited a second, got no messages");
+        categories = copyOf(entry.getCategories("xsd:string"));
+        entry = null;
+
+        logger.trace("Matched {} categories with scheme xsd:string", categories
+                .size());
+        for (Category cat : categories) {
+            if (cat.getLabel().equals("fedora-types:dsID")) {
+                logger.debug("Found Category with term: " + cat.getTerm());
+                path = cat.getTerm();
+            }
+        }
+
+        assertEquals("Got wrong datastream ID!", "DATASTREAM", path);
+        logger.trace("END: testDatastreamTerm()");
+    }
+
+    @Override
+    public void onMessage(Message message) {
+        logger.debug("Received JMS message: " + message.toString());
+
+        TextMessage tMessage = (TextMessage) message;
+        try {
+            if (LegacyMethod.canParse(message)) {
+                LegacyMethod legacy = new LegacyMethod(tMessage.getText());
+                entry = legacy.getEntry();
+                logger.debug("Parsed Entry: {}", entry.toString());
+            } else {
+                logger.warn("Could not parse message: {}", message);
+            }
+        } catch (Exception e) {
+            logger.error("Exception receiving message: {}", e);
+            fail(e.getMessage());
+        }
+        synchronized (this) {
+            this.notify();
+        }
+    }
+
+    private void waitForEntry() throws InterruptedException {
+        for (int i = 0; i < 5; i++) {
+            if (entry == null) { // must not have rec'vd event yet
+                synchronized (this) {
+                    this.wait(1000);
+                }
+            } else {
+                break;
+            }
+        }
     }
 
 }

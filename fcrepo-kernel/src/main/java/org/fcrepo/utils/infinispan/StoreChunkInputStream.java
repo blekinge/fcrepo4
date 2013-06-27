@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 /*
  * ModeShape (http://www.modeshape.org)
  * See the COPYRIGHT.txt file distributed with this work for information
@@ -7,8 +22,8 @@
  * individual contributors.
  *
  * ModeShape is free software. Unless otherwise indicated, all code in ModeShape
- * is licensed to you under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation; either version 2.1 of
+ * is licensed to you under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation; either version 2.1 of
  * the License, or (at your option) any later version.
  *
  * ModeShape is distributed in the hope that it will be useful,
@@ -32,10 +47,13 @@ import org.infinispan.loaders.CacheLoaderException;
 import org.infinispan.loaders.CacheStore;
 import org.modeshape.common.logging.Logger;
 
+
 /**
  * Merges chunks from cache and provides InputStream-feeling.
+ *
+ * @author Chris Beer
+ * @date Mar 11, 2013
  */
-
 public class StoreChunkInputStream extends InputStream {
 
     private final Logger logger;
@@ -50,12 +68,18 @@ public class StoreChunkInputStream extends InputStream {
 
     private int chunkNumber;
 
+    /**
+     * @todo Add Documentation.
+     */
     public StoreChunkInputStream(final CacheStore blobCache, final String key) {
         logger = Logger.getLogger(getClass());
         this.blobCache = blobCache;
         this.key = key;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public int read() throws IOException {
         if (indexInBuffer == -1) {
@@ -68,6 +92,9 @@ public class StoreChunkInputStream extends InputStream {
         return buffer[indexInBuffer++] & 0xff;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public int read(final byte[] b, final int off, int len) throws IOException {
         if (indexInBuffer == -1) {
@@ -85,20 +112,33 @@ public class StoreChunkInputStream extends InputStream {
         }
         System.arraycopy(buffer, indexInBuffer, b, off, len);
         indexInBuffer += len;
-        if (indexInBuffer >= buffer.length) {
-            fillBuffer();
+        // if we've just exhausted the buffer, make sure we try a new buffer on
+        // next skip/read
+        if (indexInBuffer == buffer.length) {
+            buffer = null;
+            indexInBuffer = 0;
         }
         return len;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public int available() throws IOException {
         if (buffer == null) {
-            fillBuffer();
+            return 0;
         }
-        return buffer.length - indexInBuffer;
+        if (indexInBuffer >= 0) {
+            return buffer.length - indexInBuffer;
+        } else {
+            return -1;
+        }
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public final long skip(long n) throws IOException {
         if (n <= 0 || indexInBuffer == -1) {
@@ -108,14 +148,17 @@ public class StoreChunkInputStream extends InputStream {
             fillBuffer();
             return skip(n);
         }
-        if (buffer.length + n > indexInBuffer) {
-            n = buffer.length - indexInBuffer;
+        // do not load a new buffer if skippable bytes remain in current buffer
+        if (indexInBuffer + n >= buffer.length) {
+            long skipped = buffer.length - indexInBuffer;
+            // but make sure a new buffer is loaded on next skip/read
+            buffer = null;
+            indexInBuffer = 0;
+            return skipped;
+        } else {
+            indexInBuffer += n;
+            return n;
         }
-        if (n < 0) {
-            return 0;
-        }
-        indexInBuffer += n;
-        return n;
     }
 
     private void fillBuffer() throws IOException {
@@ -131,12 +174,13 @@ public class StoreChunkInputStream extends InputStream {
 
     protected byte[] nextChunk() throws IOException {
         final String chunkKey = key + "-" + chunkNumber++;
-        logger.debug("Read chunk {0}", chunkKey);
+        logger.debug("Read chunk {0} from cache {1}", chunkKey, blobCache);
 
         try {
             final CacheEntry cacheEntry = blobCache.load(chunkKey);
 
             if (cacheEntry == null) {
+                logger.trace("Unable to read chunk {0}", chunkKey);
                 return null;
             }
 

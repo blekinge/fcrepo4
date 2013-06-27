@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.generator.dublincore;
 
@@ -5,7 +20,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 import javax.jcr.Node;
 import javax.jcr.Property;
@@ -28,7 +43,9 @@ public class JcrPropertiesGenerator implements DCGenerator {
 
         final StringBuilder str = new StringBuilder();
 
-        str.append("<oai_dc:dc xmlns:oai_dc=\"http://www.openarchives.org/OAI/2.0/oai_dc/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n");
+        str.append("<oai_dc:dc "
+                + "xmlns:oai_dc=\"http://www.openarchives.org/OAI/2.0/oai_dc/\" "
+                + "xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n");
 
         try {
             final PropertyIterator iter =
@@ -52,10 +69,8 @@ public class JcrPropertiesGenerator implements DCGenerator {
 
             str.append("</oai_dc:dc>");
 
-            return new ByteArrayInputStream(str.toString().getBytes("UTF-8"));
-        } catch (final UnsupportedEncodingException e) {
-            logger.warn("Exception rendering properties: {}", e);
-            return null;
+            return new ByteArrayInputStream(str.toString().getBytes(
+                    StandardCharsets.UTF_8));
         } catch (final RepositoryException e) {
             logger.error("Repository exception: {}", e);
             return null;

@@ -1,23 +1,81 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo.metrics;
 
-import static com.yammer.metrics.graphite.GraphiteReporter.forRegistry;
-import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.fcrepo.metrics.RegistryService.getMetrics;
+import static org.slf4j.LoggerFactory.getLogger;
 
-import com.yammer.metrics.ScheduledReporter;
-import com.yammer.metrics.graphite.Graphite;
-import com.yammer.metrics.graphite.GraphiteReporter;
+import java.lang.management.ManagementFactory;
+import java.util.concurrent.TimeUnit;
 
+import javax.management.MBeanServer;
+
+import org.slf4j.Logger;
+
+import com.codahale.metrics.JmxReporter;
+import com.codahale.metrics.MetricFilter;
+import com.codahale.metrics.graphite.Graphite;
+import com.codahale.metrics.graphite.GraphiteReporter;
+
+/**
+ * @todo Add Documentation.
+ * @author cbeer
+ * @date Mar 22, 2013
+ */
 public class ReporterFactory {
 
-    public ScheduledReporter registerGraphiteReporter(final Graphite g,
-            final String prefix) {
-        final GraphiteReporter r = forRegistry(getMetrics()).build(g);
-        r.start(1, MINUTES);
-        return r;
+    private static final Logger logger = getLogger(ReporterFactory.class);
+
+    /**
+     * @todo Add Documentation.
+     */
+    public GraphiteReporter getGraphiteReporter(final String prefix,
+            final Graphite g) {
+        final GraphiteReporter reporter =
+                GraphiteReporter.forRegistry(getMetrics()).prefixedWith(prefix)
+                        .convertRatesTo(TimeUnit.SECONDS).convertDurationsTo(
+                                TimeUnit.MILLISECONDS).filter(MetricFilter.ALL)
+                        .build(g);
+        reporter.start(1, TimeUnit.MINUTES);
+        logger.debug("Started GraphiteReporter");
+        return reporter;
     }
 
+    /**
+     * TODO
+     * 
+     * @param prefix
+     * @return
+     */
+    public JmxReporter getJmxReporter(final String prefix) {
+        MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+        final JmxReporter reporter =
+                JmxReporter.forRegistry(getMetrics()).registerWith(mbs)
+                        .inDomain("org.fcrepo").convertDurationsTo(
+                                TimeUnit.MILLISECONDS).convertRatesTo(
+                                TimeUnit.SECONDS).filter(MetricFilter.ALL)
+                        .build();
+        reporter.start();
+        logger.debug("Started JmxReporter");
+        return reporter;
+    }
+
+    /**
+     * @todo Add Documentation.
+     */
     public static ReporterFactory buildDefaultReporterFactory() {
         return new ReporterFactory();
     }

@@ -2,17 +2,14 @@
 <beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xmlns:context="http://www.springframework.org/schema/context"
-       xmlns:util="http://www.springframework.org/schema/util"
        xsi:schemaLocation="
     http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
-    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
-    http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd">
+    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd">
 
 
   <context:property-placeholder/>
 
-  <!-- Context that houses JAX-RS Resources that compose the API
-      as well as som utility gear. -->
+  <!-- Context that houses JAX-RS Resources that support the API. -->
 
   <context:annotation-config/>
 
@@ -23,6 +20,6 @@
     
   <context:annotation-config />
   
-  <context:component-scan base-package="org.fcrepo.api.legacy,org.fcrepo.generators,org.fcrepo.exceptionhandlers"/>
+  <context:component-scan base-package="org.fcrepo.services, org.fcrepo.generators,org.fcrepo.exceptionhandlers, org.fcrepo.responses"/>
 
 </beans>

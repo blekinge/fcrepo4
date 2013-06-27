@@ -1,4 +1,18 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo.spring;
 
 import java.io.IOException;
@@ -6,20 +20,28 @@ import java.util.Collections;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
-import javax.jcr.Node;
 import javax.jcr.RepositoryException;
-import javax.jcr.Session;
 
 import org.modeshape.jcr.JcrRepository;
 import org.modeshape.jcr.JcrRepositoryFactory;
-import org.modeshape.jcr.api.JcrTools;
 import org.modeshape.jcr.api.Repository;
 import org.modeshape.jcr.api.RepositoryFactory;
+import org.slf4j.Logger;
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
+/**
+ * @todo Add Documentation.
+ * @author Edwin Shin
+ * @date Feb 7, 2013
+ */
 public class ModeShapeRepositoryFactoryBean implements
         FactoryBean<JcrRepository> {
+
+    private static final Logger LOGGER = getLogger(ModeShapeRepositoryFactoryBean.class);
 
     @Inject
     private JcrRepositoryFactory jcrRepositoryFactory;
@@ -28,50 +50,53 @@ public class ModeShapeRepositoryFactoryBean implements
 
     private JcrRepository repository;
 
+    /**
+     * @todo Add Documentation.
+     */
     @PostConstruct
     public void buildRepository() throws RepositoryException, IOException {
+        if (repositoryConfiguration instanceof ClassPathResource) {
+            LOGGER.debug("Using repo config: {}",
+                         ((ClassPathResource) repositoryConfiguration).getPath());
+        }
+
         repository =
                 (JcrRepository) jcrRepositoryFactory.getRepository(Collections
                         .singletonMap(RepositoryFactory.URL,
                                 repositoryConfiguration.getURL()));
 
-        setupInitialNodes();
     }
 
-    private void setupInitialNodes() throws RepositoryException {
-        final Session s = repository.login();
-        final Node objectStore =
-                new JcrTools(true).findOrCreateNode(s, "/objects");
-
-        if (objectStore.canAddMixin("fedora:objectStore")) {
-            objectStore.addMixin("fedora:objectStore");
-
-            if (!objectStore.hasProperty("fedora:size")) {
-                objectStore.setProperty("fedora:size", 0L);
-            }
-        }
-
-        s.save();
-        s.logout();
-    }
-
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public JcrRepository getObject() throws RepositoryException, IOException {
         return repository;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public Class<?> getObjectType() {
         return Repository.class;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public boolean isSingleton() {
         return true;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     public void setRepositoryConfiguration(
             final Resource repositoryConfiguration) {
         this.repositoryConfiguration = repositoryConfiguration;
     }
+
 }

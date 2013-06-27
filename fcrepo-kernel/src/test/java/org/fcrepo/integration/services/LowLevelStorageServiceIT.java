@@ -1,4 +1,18 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo.integration.services;
 
 import static org.junit.Assert.assertEquals;
@@ -6,8 +20,6 @@ import static org.junit.Assert.assertNotEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.security.MessageDigest;
-import java.util.Collection;
 import java.util.Iterator;
 
 import javax.inject.Inject;
@@ -19,13 +31,18 @@ import org.fcrepo.Datastream;
 import org.fcrepo.services.DatastreamService;
 import org.fcrepo.services.LowLevelStorageService;
 import org.fcrepo.services.ObjectService;
-import org.fcrepo.utils.FixityResult;
 import org.fcrepo.utils.LowLevelCacheEntry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.modeshape.jcr.api.JcrConstants;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+/**
+ * @todo Add Documentation.
+ * @author fasseg
+ * @date Mar 20, 2013
+ */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration({"/spring-test/repo.xml"})
 public class LowLevelStorageServiceIT {
@@ -42,52 +59,32 @@ public class LowLevelStorageServiceIT {
     @Inject
     LowLevelStorageService lowLevelService;
 
-    @Test
-    public void testChecksumBlobs() throws Exception {
 
-        final Session session = repo.login();
-        objectService.createObjectNode(session, "testLLObject");
-        datastreamService.createDatastreamNode(session,
-                "/objects/testLLObject/testRepositoryContent",
-                "application/octet-stream", new ByteArrayInputStream(
-                        "0123456789".getBytes()));
-
-        session.save();
-
-        final Datastream ds =
-                datastreamService.getDatastream("testLLObject",
-                        "testRepositoryContent");
-
-        final Collection<FixityResult> fixityResults =
-                lowLevelService.getFixity(ds.getNode(), MessageDigest
-                        .getInstance("SHA-1"), ds.getContentDigest(), ds
-                        .getContentSize());
-
-        assertNotEquals(0, fixityResults.size());
-
-        for (final FixityResult fixityResult : fixityResults) {
-            assertEquals("urn:sha1:87acec17cd9dcd20a716cc2cf67417b71c8a7016",
-                    fixityResult.computedChecksum.toString());
-        }
-    }
-
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetBinaryBlobs() throws Exception {
         final Session session = repo.login();
-        objectService.createObjectNode(session, "testLLObject");
-        datastreamService.createDatastreamNode(session,
-                "/objects/testLLObject/testRepositoryContent",
-                "application/octet-stream", new ByteArrayInputStream(
-                        "0123456789".getBytes()));
+        objectService.createObject(session, "/testLLObject");
+        datastreamService
+            .createDatastreamNode(session,
+                                  "/testLLObject/testRepositoryContent",
+                                  "image/tiff",
+                                  new ByteArrayInputStream("0123456789987654321012345678900987654321".getBytes())
+                                  );
 
         session.save();
 
         final Datastream ds =
-                datastreamService.getDatastream("testLLObject",
-                        "testRepositoryContent");
+            datastreamService
+            .getDatastream(session, "/testLLObject/testRepositoryContent");
 
         final Iterator<LowLevelCacheEntry> inputStreamList =
-                lowLevelService.getBinaryBlobs(ds.getNode()).iterator();
+            lowLevelService
+            .getLowLevelCacheEntries(ds.getNode()
+                                     .getNode(JcrConstants.JCR_CONTENT))
+            .iterator();
 
         int i = 0;
         while (inputStreamList.hasNext()) {
@@ -95,7 +92,7 @@ public class LowLevelStorageServiceIT {
 
             final String myString = IOUtils.toString(is, "UTF-8");
 
-            assertEquals("0123456789", myString);
+            assertEquals("0123456789987654321012345678900987654321", myString);
 
             i++;
         }

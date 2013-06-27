@@ -1,11 +1,28 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.syndication;
 
+import static com.google.common.base.Throwables.propagate;
 import static com.google.common.collect.ImmutableList.copyOf;
 import static com.google.common.collect.Lists.transform;
 import static org.fcrepo.utils.EventType.getEventType;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -19,12 +36,9 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.fcrepo.AbstractResource;
 import org.joda.time.DateTime;
-import org.modeshape.common.SystemFailureException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.google.common.base.Function;
-import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.sun.syndication.feed.synd.SyndContent;
 import com.sun.syndication.feed.synd.SyndContentImpl;
@@ -36,7 +50,7 @@ import com.sun.syndication.io.FeedException;
 import com.sun.syndication.io.SyndFeedOutput;
 
 @Component
-@Path("/rss")
+@Path("/fcr:rss")
 public class RSSPublisher extends AbstractResource {
 
     private static final Integer FEED_LENGTH = 10;
@@ -47,14 +61,17 @@ public class RSSPublisher extends AbstractResource {
 
     private static final String FEED_DESCRIPTION = FEED_TITLE;
 
-    @Autowired
-    EventBus eventBus;
-
     private final BlockingQueue<Event> feedQueue =
             new ArrayBlockingQueue<Event>(FEED_LENGTH);
 
     private final SyndFeed feed = new SyndFeedImpl();
 
+    /**
+     * TODO
+     * 
+     * @return
+     * @throws FeedException
+     */
     @GET
     @Produces("application/rss+xml")
     public StreamSource getFeed() throws FeedException {
@@ -62,7 +79,7 @@ public class RSSPublisher extends AbstractResource {
         feed.setEntries(transform(copyOf(feedQueue).reverse(), event2entry));
         // TODO ought to make this stream, not go through a string
         return new StreamSource(new ByteArrayInputStream(new SyndFeedOutput()
-                .outputString(feed).getBytes()));
+                .outputString(feed).getBytes(StandardCharsets.UTF_8)));
     }
 
     private final Function<Event, SyndEntry> event2entry =
@@ -82,13 +99,16 @@ public class RSSPublisher extends AbstractResource {
                                 .toString());
                         entry.setDescription(description);
                     } catch (final RepositoryException e) {
-                        throw new SystemFailureException(e);
+                        throw propagate(e);
                     }
                     return entry;
                 }
 
             };
 
+    /**
+     * TODO
+     */
     @Override
     @PostConstruct
     public void initialize() {
@@ -98,6 +118,11 @@ public class RSSPublisher extends AbstractResource {
         feed.setDescription(FEED_DESCRIPTION);
     }
 
+    /**
+     * TODO
+     * 
+     * @param event
+     */
     @Subscribe
     public void newEvent(final Event event) {
         if (feedQueue.remainingCapacity() > 0) {

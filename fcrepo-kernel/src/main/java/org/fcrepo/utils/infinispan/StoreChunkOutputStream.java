@@ -1,18 +1,37 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo.utils.infinispan;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import org.infinispan.metadata.EmbeddedMetadata;
 import org.infinispan.container.InternalEntryFactory;
 import org.infinispan.container.InternalEntryFactoryImpl;
 import org.infinispan.container.entries.InternalCacheEntry;
-import org.infinispan.container.versioning.EntryVersion;
 import org.infinispan.loaders.CacheLoaderException;
 import org.infinispan.loaders.CacheStore;
 import org.modeshape.common.logging.Logger;
 
+/**
+ * @todo Add Documentation.
+ * @author Chris Beer
+ * @date Mar 14, 2013
+ */
 public class StoreChunkOutputStream extends OutputStream {
 
     protected final Logger logger;
@@ -31,10 +50,13 @@ public class StoreChunkOutputStream extends OutputStream {
     protected int chunkIndex;
 
     private final InternalEntryFactory entryFactory =
-            new InternalEntryFactoryImpl();
+        new InternalEntryFactoryImpl();
 
+    /**
+     * @todo Add Documentation.
+     */
     public StoreChunkOutputStream(final CacheStore blobCache,
-            final String keyPrefix) {
+                                  final String keyPrefix) {
         logger = Logger.getLogger(getClass());
         this.blobCache = blobCache;
         this.keyPrefix = keyPrefix;
@@ -48,6 +70,9 @@ public class StoreChunkOutputStream extends OutputStream {
         return chunkIndex;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public void write(final int b) throws IOException {
         if (chunkBuffer.size() == CHUNKSIZE) {
@@ -56,9 +81,12 @@ public class StoreChunkOutputStream extends OutputStream {
         chunkBuffer.write(b);
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public void write(final byte[] b, final int off, final int len)
-            throws IOException {
+        throws IOException {
         if (len + chunkBuffer.size() <= CHUNKSIZE) {
             chunkBuffer.write(b, off, len);
         } else {
@@ -69,6 +97,9 @@ public class StoreChunkOutputStream extends OutputStream {
         }
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Override
     public void close() throws IOException {
         logger.debug("Close. Buffer size at close: {0}", chunkBuffer.size());
@@ -91,18 +122,21 @@ public class StoreChunkOutputStream extends OutputStream {
             final InternalCacheEntry cacheEntry;
             if (c == null) {
                 cacheEntry =
-                        entryFactory.create(chunkKey, chunk,
-                                (EntryVersion) null);
+                    entryFactory.create(chunkKey,
+                                        chunk,
+                                        new EmbeddedMetadata
+                                        .Builder().build());
             } else {
                 cacheEntry = entryFactory.create(chunkKey, chunk, c);
             }
 
             logger.debug("Store chunk {0}", chunkKey);
             blobCache.store(cacheEntry);
+            chunkIndex++;
+            chunkBuffer.reset();
         } catch (final CacheLoaderException e) {
             throw new IOException(e);
         }
-
     }
 
 }

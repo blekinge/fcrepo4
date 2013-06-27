@@ -2,18 +2,28 @@
     "name" : "repo",
     "jndiName" : "",
     "workspaces" : {
-        "predefined" : ["fedora"],
-        "default" : "fedora",
+        "predefined" : [],
+        "default" : "default",
         "allowCreation" : true
     },
     "storage" : {
         "cacheName" : "FedoraRepository",
-        "cacheConfiguration" : "test_infinispan_configuration.xml",
+        "cacheConfiguration" : "config/infinispan/basic/infinispan.xml",
         "binaryStorage" : {
             "type" : "cache",
-            "dataCacheName" : "FedoraRepository",
+            "dataCacheName" : "FedoraRepositoryBinaryData",
             "metadataCacheName" : "FedoraRepository"
         }
+    },
+    "externalSources" : {
+      "fileSystem" : {
+        "classname" : "org.modeshape.connector.filesystem.FileSystemConnector",
+        "directoryPath" : "target/test-classes/test-objects",
+        "readonly" : false,
+        "extraPropertiesStorage": "json",
+        "cacheTtlSeconds" : 5,
+        "projections" : [ "default:/files => /" ]
+      }
     },
     "security" : {
         "anonymous" : {

@@ -5,7 +5,7 @@
 	 xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
 	 version="3.0">
     
-    <display-name>Fedora-on-ModeShape</display-name>
+    <display-name>Fedora 4</display-name>
     
     <context-param>
         <param-name>contextConfigLocation</param-name>
@@ -17,7 +17,7 @@
     </listener>
     
 	<servlet>
-		<servlet-name>jersey-serlvet</servlet-name>
+		<servlet-name>jersey-servlet</servlet-name>
 		<servlet-class>com.sun.jersey.spi.spring.container.servlet.SpringServlet</servlet-class>
 		<init-param>
 			<param-name>com.sun.jersey.config.property.packages</param-name>
@@ -27,27 +27,9 @@
 	</servlet>
  
 	<servlet-mapping>
-		<servlet-name>jersey-serlvet</servlet-name>
-		<url-pattern>/*</url-pattern>
+		<servlet-name>jersey-servlet</servlet-name>
+		<url-pattern>/rest/*</url-pattern>
 	</servlet-mapping> 
-
-  <!-- engaging the ModeShape REST API -->
-
-  <context-param>
-    <param-name>org.modeshape.jcr.URL</param-name>
-    <param-value>WEB-INF/classes/config/repository.json</param-value>
-  </context-param>
-
-  <context-param>
-    <param-name>org.modeshape.jcr.RepositoryName</param-name>
-    <param-value>repo</param-value>
-  </context-param>
-
-
-  <!-- Required parameter for ModeShape REST - should not be modified -->
-  <listener>
-    <listener-class>org.modeshape.web.jcr.ModeShapeJcrDeployer</listener-class>
-  </listener>
   
   <!-- BASIC security parameters -->
   <login-config>

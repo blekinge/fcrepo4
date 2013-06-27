@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.webhooks;
 
@@ -11,8 +26,6 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import javax.jcr.LoginException;
-import javax.jcr.NoSuchWorkspaceException;
 import javax.jcr.Node;
 import javax.jcr.NodeIterator;
 import javax.jcr.RepositoryException;
@@ -33,19 +46,28 @@ import org.apache.http.impl.conn.PoolingClientConnectionManager;
 import org.fcrepo.AbstractResource;
 import org.fcrepo.messaging.legacy.LegacyMethod;
 import org.fcrepo.observer.FedoraEvent;
+import org.fcrepo.session.InjectedSession;
+import org.fcrepo.session.SessionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 
-@Path("/webhooks")
+@Path("/fcr:webhooks")
+@Scope("prototype")
 @Component
 public class FedoraWebhooks extends AbstractResource {
 
-    static final private Logger logger = LoggerFactory
+    public static final String WEBHOOK_SEARCH = "webhook:*";
+
+    public static final String WEBHOOK_CALLBACK_PROPERTY =
+            "webhook:callbackUrl";
+
+    public static final String WEBHOOK_JCR_TYPE = "webhook:callback";
+
+    private static final Logger LOGGER = LoggerFactory
             .getLogger(FedoraWebhooks.class);
 
     protected static final PoolingClientConnectionManager connectionManager =
@@ -53,13 +75,13 @@ public class FedoraWebhooks extends AbstractResource {
 
     protected static HttpClient client;
 
-    @Autowired
-    EventBus eventBus;
+    @InjectedSession
+    protected Session session;
 
     /**
      * For use with non-mutating methods.
      */
-    private static Session readOnlySession;
+    private Session readOnlySession;
 
     static {
         connectionManager.setMaxTotal(Integer.MAX_VALUE);
@@ -70,8 +92,7 @@ public class FedoraWebhooks extends AbstractResource {
 
     @Override
     @PostConstruct
-    public void initialize() throws LoginException, NoSuchWorkspaceException,
-            RepositoryException {
+    public void initialize() throws RepositoryException {
 
         eventBus.register(this);
 
@@ -81,15 +102,29 @@ public class FedoraWebhooks extends AbstractResource {
         session.logout();
     }
 
-    public static void runHooks(final Node resource, final FedoraEvent event)
-            throws RepositoryException {
+    /**
+     * Trigger all the registered webhook callbacks for a resource when the
+     * event is received
+     * 
+     * @param resource
+     * @param event
+     * @throws RepositoryException
+     */
+    public void runHooks(final Node resource, final FedoraEvent event)
+        throws RepositoryException {
+        if (resource == null) {
+            LOGGER.warn("resource node is null; event path is {}", event
+                    .getPath());
+            return;
+        }
+
         final NodeIterator webhooksIterator =
-                resource.getSession().getRootNode().getNodes("webhook:*");
+                resource.getSession().getRootNode().getNodes(WEBHOOK_SEARCH);
 
         while (webhooksIterator.hasNext()) {
             final Node hook = webhooksIterator.nextNode();
             final String callbackUrl =
-                    hook.getProperty("webhook:callbackUrl").getString();
+                    hook.getProperty(WEBHOOK_CALLBACK_PROPERTY).getString();
             final HttpPost method = new HttpPost(callbackUrl);
             final LegacyMethod eventSerialization =
                     new LegacyMethod(event, resource);
@@ -99,14 +134,16 @@ public class FedoraWebhooks extends AbstractResource {
                 eventSerialization.writeTo(writer);
                 method.setEntity(new StringEntity(writer.toString()));
             } catch (final IOException e) {
-                e.printStackTrace();
+                LOGGER.warn("Got exception generating webhook body: {}", e);
             }
 
             try {
-                logger.debug("Firing callback for" + hook.getName());
+                LOGGER.debug("Firing callback for" + hook.getName());
                 client.execute(method);
             } catch (final IOException e) {
-                e.printStackTrace();
+                LOGGER.warn(
+                        "Got exception running webhook callback for {}: {}",
+                        hook.getName(), e);
             }
 
         }
@@ -116,7 +153,7 @@ public class FedoraWebhooks extends AbstractResource {
     public Response showWebhooks() throws RepositoryException {
 
         final NodeIterator webhooksIterator =
-                readOnlySession.getRootNode().getNodes("webhook:*");
+                session.getRootNode().getNodes("webhook:*");
         final StringBuilder str = new StringBuilder();
 
         while (webhooksIterator.hasNext()) {
@@ -131,11 +168,11 @@ public class FedoraWebhooks extends AbstractResource {
 
     @POST
     @Path("{id}")
-    public Response registerWebhook(@PathParam("id")
-    final String id, @FormParam("callbackUrl")
-    final String callbackUrl) throws RepositoryException {
-
-        final Session session = getAuthenticatedSession();
+    public Response registerWebhook(
+            @PathParam("id")
+            final String id, 
+            @FormParam("callbackUrl")
+            final String callbackUrl) throws RepositoryException {
 
         final Node n =
                 jcrTools.findOrCreateChild(session.getRootNode(), "webhook:" +
@@ -153,12 +190,9 @@ public class FedoraWebhooks extends AbstractResource {
     @Path("{id}")
     public Response registerWebhook(@PathParam("id")
     final String id) throws RepositoryException {
-
-        final Session session = getAuthenticatedSession();
-
         final Node n =
                 jcrTools.findOrCreateChild(session.getRootNode(), "webhook:" +
-                        id, "webhook:callback");
+                        id, WEBHOOK_JCR_TYPE);
         n.remove();
 
         session.save();
@@ -167,17 +201,31 @@ public class FedoraWebhooks extends AbstractResource {
         return noContent().build();
     }
 
+    /**
+     * Listen to the EventBus and trigger webhooks callbacks (see .runHooks)
+     * 
+     * @param event
+     */
     @Subscribe
     public void onEvent(final FedoraEvent event) {
         try {
-            logger.debug("Webhooks received event: {}", event);
+            LOGGER.debug("Webhooks received event: {}", event);
             final Node resource =
-                    jcrTools.findOrCreateNode(readOnlySession, event.getPath());
+                    jcrTools.findOrCreateNode(readOnlySession.getRepository()
+                            .login(), event.getPath());
 
             runHooks(resource, event);
         } catch (final RepositoryException e) {
-            logger.error("Got a repository exception handling message: {}", e);
+            LOGGER.error("Got a repository exception handling message: {}", e);
         }
+    }
+
+    public void setSession(final Session session) {
+        this.session = session;
+    }
+
+    public void setReadOnlySessionSession(final Session session) {
+        this.readOnlySession = session;
     }
 
     @PostConstruct
@@ -192,5 +240,9 @@ public class FedoraWebhooks extends AbstractResource {
     @PreDestroy
     public final void logoutSession() {
         readOnlySession.logout();
+    }
+
+    public void setSessionFactory(final SessionFactory sessions) {
+        this.sessions = sessions;
     }
 }

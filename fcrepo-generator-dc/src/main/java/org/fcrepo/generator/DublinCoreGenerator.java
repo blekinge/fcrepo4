@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.generator;
 
@@ -8,48 +23,62 @@ import java.io.InputStream;
 import java.util.List;
 
 import javax.annotation.Resource;
-import javax.jcr.Node;
 import javax.jcr.PathNotFoundException;
 import javax.jcr.RepositoryException;
+import javax.jcr.Session;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.PathSegment;
 import javax.ws.rs.core.Response;
 
 import org.fcrepo.AbstractResource;
+import org.fcrepo.FedoraResource;
 import org.fcrepo.generator.dublincore.DCGenerator;
-import org.fcrepo.services.ObjectService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.fcrepo.session.InjectedSession;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 @Component
-@Path("/oai/objects/{pid}/oai_dc")
+@Scope("prototype")
+@Path("/{path: .*}/oai:dc")
 public class DublinCoreGenerator extends AbstractResource {
 
     @Resource
-    private List<DCGenerator> dcgenerators;
+    List<DCGenerator> dcgenerators;
 
-    @Autowired
-    private ObjectService objectService;
+    @InjectedSession
+    protected Session session;
 
     @GET
     @Produces(TEXT_XML)
-    public Response getObjectAsDublinCore(@PathParam("pid")
-    final String pid) throws RepositoryException {
+    public Response getObjectAsDublinCore(
+            @PathParam("path")
+            final List<PathSegment> pathList) throws RepositoryException {
 
-        final Node obj = objectService.getObjectNode(pid);
+        try {
+            final String path = toPath(pathList);
+            final FedoraResource obj = nodeService.getObject(session, path);
 
-        for (final DCGenerator indexer : dcgenerators) {
-            final InputStream inputStream = indexer.getStream(obj);
+            for (final DCGenerator indexer : dcgenerators) {
+                final InputStream inputStream =
+                        indexer.getStream(obj.getNode());
 
-            if (inputStream != null) {
-                return ok(inputStream).build();
+                if (inputStream != null) {
+                    return ok(inputStream).build();
+                }
             }
+            // no indexers = no path for DC
+            throw new PathNotFoundException();
+        } finally {
+            session.logout();
         }
-        // no indexers = no path for DC
-        throw new PathNotFoundException();
 
+    }
+
+    public void setSession(final Session session) {
+        this.session = session;
     }
 
 }

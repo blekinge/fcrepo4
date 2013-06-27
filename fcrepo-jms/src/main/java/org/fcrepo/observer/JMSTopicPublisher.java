@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.observer;
 
@@ -8,7 +23,6 @@ import java.io.IOException;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
-import javax.jcr.LoginException;
 import javax.jcr.Repository;
 import javax.jcr.RepositoryException;
 import javax.jcr.observation.Event;
@@ -20,6 +34,7 @@ import javax.jms.Session;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.slf4j.Logger;
+
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 
@@ -43,26 +58,25 @@ public class JMSTopicPublisher {
 
     private MessageProducer producer;
 
-    final private Logger logger = getLogger(JMSTopicPublisher.class);
+    private final Logger LOGGER = getLogger(JMSTopicPublisher.class);
 
     private javax.jcr.Session session;
 
     @Subscribe
     public void publishJCREvent(final Event fedoraEvent) throws JMSException,
-            RepositoryException, IOException {
-        logger.debug("Received an event from the internal bus.");
+        RepositoryException, IOException {
+        LOGGER.debug("Received an event from the internal bus.");
         final Message tm =
                 eventFactory.getMessage(fedoraEvent, session, jmsSession);
-        logger.debug("Transformed the event to a JMS message.");
+        LOGGER.debug("Transformed the event to a JMS message.");
         producer.send(tm);
 
-        logger.debug("Put event: \n{}\n onto JMS.", tm.getJMSMessageID());
+        LOGGER.debug("Put event: \n{}\n onto JMS.", tm.getJMSMessageID());
     }
 
     @PostConstruct
-    public void acquireConnections() throws JMSException, LoginException,
-            RepositoryException {
-        logger.debug("Initializing: " + this.getClass().getCanonicalName());
+    public void acquireConnections() throws JMSException, RepositoryException {
+        LOGGER.debug("Initializing: " + this.getClass().getCanonicalName());
 
         connection = connectionFactory.createConnection();
         connection.start();
@@ -75,7 +89,7 @@ public class JMSTopicPublisher {
 
     @PreDestroy
     public void releaseConnections() throws JMSException {
-        logger.debug("Tearing down: " + this.getClass().getCanonicalName());
+        LOGGER.debug("Tearing down: " + this.getClass().getCanonicalName());
 
         producer.close();
         jmsSession.close();

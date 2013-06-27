@@ -1,9 +1,20 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo;
 
-import static org.fcrepo.TestHelpers.checksumString;
-import static org.fcrepo.TestHelpers.getContentNodeMock;
-import static org.fcrepo.services.PathService.getDatastreamJcrNodePath;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
@@ -14,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.modeshape.jcr.api.JcrConstants.JCR_CONTENT;
 import static org.modeshape.jcr.api.JcrConstants.JCR_DATA;
+import static org.modeshape.jcr.api.JcrConstants.JCR_MIME_TYPE;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,15 +39,13 @@ import javax.jcr.PropertyIterator;
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 import javax.jcr.ValueFactory;
-import javax.jcr.ValueFormatException;
-import javax.jcr.lock.LockException;
-import javax.jcr.nodetype.ConstraintViolationException;
-import javax.jcr.version.VersionException;
+import javax.jcr.nodetype.NodeType;
 
 import org.apache.tika.io.IOUtils;
 import org.fcrepo.exception.InvalidChecksumException;
 import org.fcrepo.utils.FedoraJcrTypes;
 import org.fcrepo.utils.FedoraTypesUtils;
+import org.fcrepo.utils.TestHelpers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,11 +53,20 @@ import org.junit.runner.RunWith;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
+/**
+ * @todo Add Documentation.
+ * @author ajs6f
+ * @date Feb 21, 2013
+ */
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({FedoraTypesUtils.class})
+@PowerMockIgnore({ "org.slf4j.*",
+            "javax.xml.parsers.*",
+            "org.apache.xerces.*" })
+@PrepareForTest({ FedoraTypesUtils.class })
 public class DatastreamTest implements FedoraJcrTypes {
 
     String testPid = "testObj";
@@ -62,27 +81,30 @@ public class DatastreamTest implements FedoraJcrTypes {
 
     Node mockDsNode;
 
+    /**
+     * @todo Add Documentation.
+     */
     @Before
     public void setUp() {
-        final String relPath =
-                getDatastreamJcrNodePath(testPid, testDsId).substring(1);
 
         mockSession = mock(Session.class);
         mockRootNode = mock(Node.class);
         mockDsNode = mock(Node.class);
+        final NodeType[] nodeTypes = new NodeType[0];
         try {
+            when(mockDsNode.getMixinNodeTypes()).thenReturn(nodeTypes);
             when(mockDsNode.getName()).thenReturn(testDsId);
             when(mockDsNode.getSession()).thenReturn(mockSession);
-            when(mockSession.getRootNode()).thenReturn(mockRootNode);
-            when(mockRootNode.getNode(relPath)).thenReturn(mockDsNode);
-            testObj = new Datastream(mockSession, "testObj", "testDs");
-            verify(mockRootNode).getNode(relPath);
+            testObj = new Datastream(mockDsNode);
         } catch (final RepositoryException e) {
             e.printStackTrace();
             fail(e.getMessage());
         }
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @After
     public void tearDown() {
         mockSession = null;
@@ -90,111 +112,148 @@ public class DatastreamTest implements FedoraJcrTypes {
         mockDsNode = null;
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetNode() {
         assertEquals(testObj.getNode(), mockDsNode);
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetContent() throws RepositoryException, IOException {
         final String expected = "asdf";
-        final Node mockContent = getContentNodeMock(expected);
+        final Node mockContent = TestHelpers.getContentNodeMock(expected);
         when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
         final String actual = IOUtils.toString(testObj.getContent());
         assertEquals(expected, actual);
-        verify(mockDsNode).getNode(JCR_CONTENT);
         verify(mockContent).getProperty(JCR_DATA);
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testSetContent() throws RepositoryException,
             InvalidChecksumException {
         final org.modeshape.jcr.api.Binary mockBin =
                 mock(org.modeshape.jcr.api.Binary.class);
+        final InputStream mockStream = mock(InputStream.class);
         PowerMockito.mockStatic(FedoraTypesUtils.class);
         when(
                 FedoraTypesUtils.getBinary(any(Node.class),
-                        any(InputStream.class))).thenReturn(mockBin);
-        final InputStream content = mock(InputStream.class);
-        final Node mockContent = getContentNodeMock(8);
+                        any(InputStream.class), any(String.class))).thenReturn(
+                mockBin);
+        final Node mockContent = TestHelpers.getContentNodeMock(8);
         when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
         final ValueFactory mockVF = mock(ValueFactory.class);
         when(mockSession.getValueFactory()).thenReturn(mockVF);
         when(mockVF.createBinary(any(InputStream.class))).thenReturn(mockBin);
-        final Property mockSize = mock(Property.class);
-        when(mockContent.setProperty(JCR_DATA, mockBin)).thenReturn(mockSize);
-        testObj.setContent(content);
+        final Property mockData = mock(Property.class);
+        when(mockContent.canAddMixin(FEDORA_BINARY)).thenReturn(true);
+        when(mockContent.setProperty(JCR_DATA, mockBin)).thenReturn(mockData);
+        when(mockContent.getProperty(JCR_DATA)).thenReturn(mockData);
+        when(mockData.getBinary()).thenReturn(mockBin);
+        testObj.setContent(mockStream);
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void getContentSize() throws RepositoryException {
         final int expectedContentLength = 2;
-        final Node mockContent = getContentNodeMock(expectedContentLength);
+        final Node mockContent =
+                TestHelpers.getContentNodeMock(expectedContentLength);
         when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
         final long actual = testObj.getContentSize();
-        verify(mockDsNode).getNode(JCR_CONTENT);
         verify(mockContent).getProperty(CONTENT_SIZE);
         assertEquals(expectedContentLength, actual);
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void getContentDigest() throws RepositoryException {
         final String content = "asdf";
-        final URI expected = URI.create("urn:sha1:" + checksumString(content));
-        final Node mockContent = getContentNodeMock(content);
+        final URI expected =
+                URI.create(TestHelpers.checksumString(content));
+        final Node mockContent = TestHelpers.getContentNodeMock(content);
         when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
         final URI actual = testObj.getContentDigest();
         assertEquals(expected, actual);
-        verify(mockContent).getProperty(DIGEST_ALGORITHM);
-        verify(mockContent).getProperty(DIGEST_VALUE);
+        verify(mockContent).getProperty(CONTENT_DIGEST);
     }
 
-    @Test
-    public void getContentDigestType() throws RepositoryException {
-        final String expected = "SHA-1";
-        final Node mockContent = getContentNodeMock(8);
-        when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
-        final String actual = testObj.getContentDigestType();
-        assertEquals(expected, actual);
-        verify(mockContent).getProperty(DIGEST_ALGORITHM);
-    }
-
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetDsId() throws RepositoryException {
         final String actual = testObj.getDsId();
         assertEquals(testDsId, actual);
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetObject() throws RepositoryException {
         final Node mockObjectNode = mock(Node.class);
+        final NodeType mockNodeType = mock(NodeType.class);
+        when(mockNodeType.getName()).thenReturn(FEDORA_OBJECT);
+        when(mockObjectNode.getMixinNodeTypes()).thenReturn(new NodeType[] { mockNodeType });
         when(mockDsNode.getParent()).thenReturn(mockObjectNode);
         final FedoraObject actual = testObj.getObject();
         assertNotNull(actual);
-        assertEquals(actual.getNode(), mockObjectNode);
-        verify(mockDsNode).getParent();
+        assertEquals(mockObjectNode, actual.getNode());
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetMimeType() throws RepositoryException {
-        testObj.getMimeType();
-        verify(mockDsNode).hasProperty(FEDORA_CONTENTTYPE);
+        final Node mockContent = TestHelpers.getContentNodeMock(8);
+        when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
+        when(mockDsNode.hasNode(JCR_CONTENT)).thenReturn(true);
+        when(mockContent.hasProperty(JCR_MIME_TYPE)).thenReturn(true);
+
+        final Property mockProperty = mock(Property.class);
+        when(mockContent.getProperty(JCR_MIME_TYPE)).thenReturn(mockProperty);
+        when(mockProperty.getString()).thenReturn("application/x-mime-type");
+        assertEquals("application/x-mime-type", testObj.getMimeType());
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
-    public void testGetLabel() throws RepositoryException {
-        testObj.getLabel();
-        verify(mockDsNode).hasProperty(DC_TITLE);
+    public void testGetMimeTypeWithNoContent() throws RepositoryException {
+        when(mockDsNode.hasNode(JCR_CONTENT)).thenReturn(false);
+        assertEquals("application/octet-stream", testObj.getMimeType());
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
-    public void testSetLabel() throws ValueFormatException, VersionException,
-            LockException, ConstraintViolationException, RepositoryException {
-        final String expected = "foo";
-        testObj.setLabel(expected);
-        verify(mockDsNode).setProperty(DC_TITLE, expected);
+    public void testGetMimeTypeWithDefault() throws RepositoryException {
+        final Node mockContent = TestHelpers.getContentNodeMock(8);
+        when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
+        when(mockDsNode.hasNode(JCR_CONTENT)).thenReturn(true);
+        when(mockContent.hasProperty(JCR_MIME_TYPE)).thenReturn(false);
+
+        assertEquals("application/octet-stream", testObj.getMimeType());
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetCreatedDate() throws RepositoryException {
         final Date expected = new Date();
@@ -202,11 +261,15 @@ public class DatastreamTest implements FedoraJcrTypes {
         cal.setTime(expected);
         final Property mockProp = mock(Property.class);
         when(mockProp.getDate()).thenReturn(cal);
+        when(mockDsNode.hasProperty(JCR_CREATED)).thenReturn(true);
         when(mockDsNode.getProperty(JCR_CREATED)).thenReturn(mockProp);
         final Date actual = testObj.getCreatedDate();
         assertEquals(expected.getTime(), actual.getTime());
     }
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetLastModifiedDate() throws RepositoryException {
         final Date expected = new Date();
@@ -214,22 +277,21 @@ public class DatastreamTest implements FedoraJcrTypes {
         cal.setTime(expected);
         final Property mockProp = mock(Property.class);
         when(mockProp.getDate()).thenReturn(cal);
+        when(mockDsNode.hasProperty(JCR_LASTMODIFIED)).thenReturn(true);
         when(mockDsNode.getProperty(JCR_LASTMODIFIED)).thenReturn(mockProp);
         final Date actual = testObj.getLastModifiedDate();
         assertEquals(expected.getTime(), actual.getTime());
     }
 
-    @Test
-    public void testPurge() throws RepositoryException {
-        testObj.purge();
-        verify(mockDsNode).remove();
-    }
-
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void testGetSize() throws RepositoryException {
         final int expectedProps = 1;
         final int expectedContentLength = 2;
-        final Node mockContent = getContentNodeMock(expectedContentLength);
+        final Node mockContent =
+                TestHelpers.getContentNodeMock(expectedContentLength);
         when(mockDsNode.getNode(JCR_CONTENT)).thenReturn(mockContent);
         when(mockDsNode.getProperties()).thenAnswer(
                 new Answer<PropertyIterator>() {
@@ -242,8 +304,24 @@ public class DatastreamTest implements FedoraJcrTypes {
                     }
                 });
         final long actual = testObj.getSize();
-        verify(mockDsNode, times(1)).getNode(JCR_CONTENT);
         verify(mockDsNode, times(1)).getProperties();
         assertEquals(3, actual);
+    }
+
+    /**
+     * @todo Add Documentation.
+     */
+    @Test
+    public void testHasMixin() throws RepositoryException {
+        final NodeType mockYes = mock(NodeType.class);
+        when(mockYes.getName()).thenReturn(FEDORA_DATASTREAM);
+        final NodeType mockNo = mock(NodeType.class);
+        when(mockNo.getName()).thenReturn("not" + FEDORA_DATASTREAM);
+        final NodeType[] types = new NodeType[] {mockYes};
+        final Node test = mock(Node.class);
+        when(test.getMixinNodeTypes()).thenReturn(types);
+        assertEquals(true, Datastream.hasMixin(test));
+        types[0] = mockNo;
+        assertEquals(false, Datastream.hasMixin(test));
     }
 }

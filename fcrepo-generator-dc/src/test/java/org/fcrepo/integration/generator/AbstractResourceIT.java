@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.integration.generator;
 
@@ -13,6 +28,7 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.PoolingClientConnectionManager;
+import org.fcrepo.utils.FedoraJcrTypes;
 import org.junit.Before;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -35,10 +51,10 @@ public abstract class AbstractResourceIT {
     protected static final String HOSTNAME = "localhost";
 
     protected static final String serverAddress = "http://" + HOSTNAME + ":" +
-            SERVER_PORT + "/rest/";
+            SERVER_PORT + "/";
 
     protected static final String serverOAIAddress = "http://" + HOSTNAME +
-            ":" + SERVER_PORT + "/oai/";
+            ":" + SERVER_PORT + "/";
 
     protected final PoolingClientConnectionManager connectionManager =
             new PoolingClientConnectionManager();
@@ -59,19 +75,19 @@ public abstract class AbstractResourceIT {
     protected static HttpPost postDSMethod(final String pid, final String ds,
             final String content) throws UnsupportedEncodingException {
         final HttpPost post =
-                new HttpPost(serverAddress + "objects/" + pid +
-                        "/datastreams/" + ds);
+                new HttpPost(serverAddress + "objects/" + pid + "/" + ds +
+                        "?mixin=" + FedoraJcrTypes.FEDORA_DATASTREAM);
         post.setEntity(new StringEntity(content));
         return post;
     }
 
     protected static HttpPut putDSMethod(final String pid, final String ds) {
-        return new HttpPut(serverAddress + "objects/" + pid + "/datastreams/" +
-                ds);
+        return new HttpPut(serverAddress + "objects/" + pid + "/" + ds +
+                "?mixin=" + FedoraJcrTypes.FEDORA_DATASTREAM);
     }
 
     protected int getStatus(final HttpUriRequest method)
-            throws ClientProtocolException, IOException {
+        throws ClientProtocolException, IOException {
         logger.debug("Executing: " + method.getMethod() + " to " +
                 method.getURI());
         return client.execute(method).getStatusLine().getStatusCode();

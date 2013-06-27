@@ -1,16 +1,33 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo.utils;
 
 /**
  * A convenient abstraction over JCR's integer-typed events.
- * 
- * @author ajs6f
  *
+ * @author ajs6f
+ * @date Feb 7, 2013
  */
 public enum EventType {
     NODE_ADDED, NODE_REMOVED, PROPERTY_ADDED, PROPERTY_REMOVED,
     PROPERTY_CHANGED, NODE_MOVED, PERSIST;
 
+    /**
+     * @todo Add Documentation.
+     */
     public static EventType getEventType(final Integer i) {
         switch (i) {
             case 0x1:

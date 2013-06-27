@@ -1,3 +1,18 @@
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.fcrepo.integration;
 
@@ -20,13 +35,13 @@ import org.slf4j.LoggerFactory;
 public class SanityCheckIT {
 
     /**
-     * The server port of the application, set as system property by 
+     * The server port of the application, set as system property by
      * maven-failsafe-plugin.
      */
     private static final String SERVER_PORT = System.getProperty("test.port");
 
     /**
-    * The context path of the application (including the leading "/"), set as 
+    * The context path of the application (including the leading "/"), set as
     * system property by maven-failsafe-plugin.
     */
     private static final String CONTEXT_PATH = System
@@ -58,8 +73,7 @@ public class SanityCheckIT {
 
     @Test
     public void doASanityCheck() throws IOException {
-        assertEquals(200, getStatus(new HttpGet(serverAddress +
-                "/rest/describe")));
+        assertEquals(200, getStatus(new HttpGet(serverAddress + "rest/")));
     }
 
     protected int getStatus(final HttpUriRequest method)

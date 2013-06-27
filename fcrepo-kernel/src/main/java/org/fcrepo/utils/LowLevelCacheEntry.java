@@ -1,8 +1,21 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo.utils;
 
 import static com.google.common.base.Throwables.propagate;
-import static java.util.Objects.hash;
 import static org.fcrepo.utils.FixityResult.FixityState.BAD_CHECKSUM;
 import static org.fcrepo.utils.FixityResult.FixityState.BAD_SIZE;
 import static org.fcrepo.utils.FixityResult.FixityState.SUCCESS;
@@ -10,167 +23,145 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.security.MessageDigest;
-import java.util.Properties;
+import java.security.NoSuchAlgorithmException;
 
-import org.apache.poi.util.IOUtils;
-import org.fcrepo.utils.infinispan.StoreChunkInputStream;
-import org.fcrepo.utils.infinispan.StoreChunkOutputStream;
-import org.infinispan.loaders.AbstractCacheStoreConfig;
-import org.infinispan.loaders.CacheStore;
-import org.infinispan.loaders.CacheStoreConfig;
-import org.infinispan.loaders.file.FileCacheStoreConfig;
 import org.modeshape.jcr.value.BinaryKey;
-import org.modeshape.jcr.value.binary.BinaryStore;
 import org.modeshape.jcr.value.binary.BinaryStoreException;
-import org.modeshape.jcr.value.binary.infinispan.InfinispanBinaryStore;
 import org.slf4j.Logger;
 
-public class LowLevelCacheEntry {
+/**
+ * Manage low-level I/O from a cache store
+ * (or, for an ISPN store, a cache loader) in order
+ * to report on e.g. fixity.
+ *
+ * @author Chris Beer
+ * @date Mar 15, 2013
+ */
+public abstract class LowLevelCacheEntry {
 
-    private static final Logger logger = getLogger(LowLevelCacheEntry.class);
+    private static final Logger LOGGER = getLogger(LowLevelCacheEntry.class);
 
-    private static final String DATA_SUFFIX = "-data";
+    protected static final String DATA_SUFFIX = "-data";
 
-    private final BinaryStore store;
 
-    private final CacheStore cacheStore;
+    protected String externalId;
 
-    private final BinaryKey key;
+    protected final BinaryKey key;
 
-    public LowLevelCacheEntry(final BinaryStore store,
-            final CacheStore lowLevelStore, final BinaryKey key) {
-        this.store = store;
-        cacheStore = lowLevelStore;
+    protected LowLevelCacheEntry(final BinaryKey key) {
         this.key = key;
+        this.externalId = "";
     }
 
-    public LowLevelCacheEntry(final BinaryStore store, final BinaryKey key) {
-        this.store = store;
-        cacheStore = null;
-        this.key = key;
-    }
+    /**
+     * Get a raw input stream from the underlying store
+     * @return the content for this entry
+     * @throws BinaryStoreException
+     */
+    public abstract InputStream getInputStream() throws BinaryStoreException;
 
-    @Override
-    public boolean equals(final Object other) {
-        if (other instanceof LowLevelCacheEntry) {
-            final LowLevelCacheEntry that = (LowLevelCacheEntry) other;
+    /**
+     * Send a raw input stream to the underlying store for this entry; used for
+     * fixing e.g. fixity failures.
+     *
+     * @param stream binary content to REPLACE the content in the store
+     * @throws BinaryStoreException
+     * @throws IOException
+     */
+    public abstract void storeValue(final InputStream stream)
+        throws BinaryStoreException, IOException;
 
-            return key.equals(that.key) &&
-                    store.equals(that.store) &&
-                    (cacheStore == null && that.cacheStore == null || cacheStore != null &&
-                            cacheStore.equals(that.cacheStore));
-        } else {
-            return false;
-        }
-    }
+    /**
+     * Generate a human-readable identifier for the location of this entry
+     *
+     * @return
+     */
+    public abstract String getExternalIdentifier();
 
-    @Override
-    public int hashCode() {
-        return hash(store, cacheStore, key);
-    }
-
-    public InputStream getInputStream() throws BinaryStoreException {
-        if (store instanceof InfinispanBinaryStore) {
-            return new StoreChunkInputStream(cacheStore, key.toString() +
-                    DATA_SUFFIX);
-        } else {
-            return store.getInputStream(key);
-        }
-    }
-
-    public void storeValue(final InputStream stream)
-            throws BinaryStoreException, IOException {
-        if (store instanceof InfinispanBinaryStore) {
-            final OutputStream outputStream =
-                    new StoreChunkOutputStream(cacheStore, key.toString() +
-                            DATA_SUFFIX);
-            IOUtils.copy(stream, outputStream);
-            outputStream.close();
-        } else {
-            // the BinaryStore will calculate a new key for us.
-            store.storeValue(stream);
-        }
-    }
-
-    public String getExternalIdentifier() {
-
-        if (store instanceof InfinispanBinaryStore) {
-
-            final CacheStoreConfig config = cacheStore.getCacheStoreConfig();
-
-            String externalId = null;
-            if (config instanceof AbstractCacheStoreConfig) {
-                final Properties properties =
-                        ((AbstractCacheStoreConfig) config).getProperties();
-                if (properties.containsKey("id")) {
-                    return properties.getProperty("id");
-                }
-
-            }
-
-            if (externalId == null && config instanceof FileCacheStoreConfig) {
-                externalId = ((FileCacheStoreConfig) config).getLocation();
-            }
-
-            if (externalId == null) {
-                externalId = config.toString();
-            }
-
-            return store.getClass().getName() + ":" +
-                    cacheStore.getCacheStoreConfig().getCacheLoaderClassName() +
-                    ":" + externalId;
-
-        } else {
-            return store.toString();
-        }
-    }
-
-    public FixityResult checkFixity(final URI checksum, final long size,
-            final MessageDigest digest) throws BinaryStoreException {
-        FixityResult result = null;
-        FixityInputStream ds = null;
+    /**
+     * Check the entry's InputStream against the checksum and size.
+     *
+     * @param checksum
+     * @param size
+     * @param digest
+     * @return
+     * @throws BinaryStoreException
+     */
+    public FixityResult checkFixity(final URI checksum, final long size)
+        throws BinaryStoreException {
+        final FixityInputStream ds;
+        final String digest = ContentDigest.getAlgorithm(checksum);
         try {
-            ds =
-                    new FixityInputStream(getInputStream(),
-                            (MessageDigest) digest.clone());
+            ds = new FixityInputStream(getInputStream(),
+                                       MessageDigest.getInstance(digest));
+        } catch (NoSuchAlgorithmException e) {
+            LOGGER.warn("Could not create MessageDigest: {}", e);
+            throw propagate(e);
+        }
 
-            result = new FixityResult(this);
+        try {
 
             while (ds.read() != -1) {
                 // noop; we're just reading the stream for the checksum and size
             }
 
-            result.computedChecksum =
-                    ContentDigest.asURI(digest.getAlgorithm(), ds
-                            .getMessageDigest().digest());
-            result.computedSize = ds.getByteCount();
-            result.dsChecksum = checksum;
-            result.dsSize = size;
+            final FixityResult result =
+                new FixityResult(this, ds.getByteCount(),
+                                 ContentDigest
+                                 .asURI(digest,
+                                        ds.getMessageDigest().digest()));
 
-            if (!result.computedChecksum.equals(result.dsChecksum)) {
+            if (!result.matches(checksum)) {
                 result.status.add(BAD_CHECKSUM);
             }
 
-            if (result.dsSize != result.computedSize) {
+            if (!result.matches(size)) {
                 result.status.add(BAD_SIZE);
             }
 
-            if (result.status.isEmpty()) {
+            if (result.matches(size, checksum)) {
                 result.status.add(SUCCESS);
             }
 
-            logger.debug("Got " + result.toString());
-            ds.close();
-        } catch (final CloneNotSupportedException e) {
-            logger.warn("Could not clone MessageDigest: {}", e);
-            throw propagate(e);
+            LOGGER.debug("Got {}", result.toString());
+
+            return result;
         } catch (final IOException e) {
             throw propagate(e);
+        } finally {
+            try {
+                ds.close();
+            } catch (IOException e) {
+                LOGGER.debug("Got error closing input stream: {}", e);
+            }
         }
 
-        return result;
     }
+
+    /**
+     * Set a meaningful identifier from some higher level that we should
+     * dutifully pass through.
+     *
+     * @param externalId some identifier for the cache store
+     */
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
+    }
+
+    /**
+     * Return the external identifier.
+     */
+    public String getExternalId() {
+        return externalId;
+    }
+
+    /**
+     * @todo Add Documentation.
+     */
+    public BinaryKey getKey() {
+        return key;
+    }
+
 }

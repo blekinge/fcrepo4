@@ -1,4 +1,18 @@
-
+/**
+ * Copyright 2013 DuraSpace, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.fcrepo.integration.utils.infinispan;
 
 import static org.junit.Assert.assertEquals;
@@ -15,12 +29,20 @@ import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.junit.Test;
 
+/**
+ * @todo Add Documentation.
+ * @author fasseg
+ * @date Mar 20, 2013
+ */
 public class StoreChunkInputStreamIT {
 
+    /**
+     * @todo Add Documentation.
+     */
     @Test
     public void tryRetrievingContentFromInfinispanIT() throws IOException {
         final EmbeddedCacheManager cm =
-                new DefaultCacheManager("test_infinispan_configuration.xml");
+                new DefaultCacheManager("config/infinispan/basic/infinispan.xml");
 
         final Cache<String, byte[]> ispn = cm.getCache("FedoraRepository");
 

@@ -1,0 +1,23 @@
+body { padding-top: 40px; }
+
+.mode_root #action_delete {
+    display: none;
+}
+
+
+.nt_file #action_create, .nt_resource #action_create {
+    display: none;
+}
+
+.nt_file #action_import, .nt_resource #action_import {
+    display: none;
+}
+
+.well {
+    text-indent: -35px;
+    padding-left: 54px;
+}
+
+#datastream_payload {
+    display: none;
+}
